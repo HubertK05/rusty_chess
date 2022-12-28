@@ -1,4 +1,7 @@
-﻿use std::{ops::{Add, AddAssign, Mul}, fmt::{Display, self}, collections::{HashSet, HashMap, BTreeMap, BTreeSet}, hash::Hash, char::MAX, pin::Pin};
+﻿pub mod move_register;
+use std::{ops::{Add, AddAssign, Mul}, fmt::{Display, self}, collections::{HashSet, HashMap, BTreeMap, BTreeSet}, hash::Hash, char::MAX, pin::Pin};
+use move_register::{Move, ChessMove, Capture, EnPassantMove, CastleMove, CastleType, PromotionMove};
+use dyn_clone::DynClone;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PieceType {
@@ -23,15 +26,63 @@ impl Display for PieceType {
         Ok(())
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FenPieceType {
+    WhitePawn,
+    WhiteKnight,
+    WhiteBishop,
+    WhiteRook,
+    WhiteQueen,
+    WhiteKing,
+    BlackPawn,
+    BlackKnight,
+    BlackBishop,
+    BlackRook,
+    BlackQueen,
+    BlackKing,
+}
+
+impl ToString for FenPieceType {
+    fn to_string(&self) -> String {
+        let str = match self {
+            FenPieceType::WhitePawn => "P",
+            FenPieceType::WhiteKnight => "N",
+            FenPieceType::WhiteBishop => "B",
+            FenPieceType::WhiteRook => "R",
+            FenPieceType::WhiteQueen => "Q",
+            FenPieceType::WhiteKing => "K",
+            FenPieceType::BlackPawn => "p",
+            FenPieceType::BlackKnight => "n",
+            FenPieceType::BlackBishop => "b",
+            FenPieceType::BlackRook => "r",
+            FenPieceType::BlackQueen => "q",
+            FenPieceType::BlackKing => "k",
+        };
+        str.into()
+    }
+}
+
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum Color {
     White,
     Black,
 }
+
+impl ToString for Color {
+    fn to_string(&self) -> String {
+        let str = match self {
+            Color::White => "White",
+            Color::Black => "Black",
+        };
+        str.into()
+    }
+}
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct PiecePosition {
-    file: i8,
-    rank: i8,
+    pub file: i8,
+    pub rank: i8,
 }
 
 impl PiecePosition {
@@ -52,6 +103,13 @@ impl PiecePosition {
             1 => if squares.0.contains(&self) { Ok(()) } else { Err(MoveError::MoveFilteredOut) },
             2 => Err(MoveError::MoveFilteredOut),
             _ => unreachable!(),
+        }
+    }
+
+    fn verify_with_en_passant_checked_square(&self, sq: &EnPassantCheckSquare) -> Result<(), MoveError> {
+        match sq.0 {
+            Some(s) => if self == &s { Ok(()) } else { Err(MoveError::MoveFilteredOut) },
+            None => Err(MoveError::MoveFilteredOut),
         }
     }
 
@@ -77,7 +135,7 @@ impl From<[i8; 2]> for PiecePosition {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct Vec2(i8, i8);
+pub struct Vec2(pub i8, pub i8);
 
 impl From<&MoveDir> for Vec2 {
     fn from(val: &MoveDir) -> Self {
@@ -161,54 +219,70 @@ impl From<PiecePosition> for Vec2 {
     }
 }
 
-#[derive(Debug)]
+impl From<Vec2> for PiecePosition {
+    fn from(val: Vec2) -> Self {
+        PiecePosition { file: val.0, rank: val.1 }
+    }
+}
+
+#[derive(Debug, Clone)]
 struct Pawn {
     color: Color,
     position: PiecePosition,
     enpassantable: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Knight {
     color: Color,
     position: PiecePosition,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Bishop {
     color: Color,
     position: PiecePosition,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Rook {
     color: Color,
     position: PiecePosition,
     has_moved: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Queen {
     color: Color,
     position: PiecePosition,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct King {
     color: Color,
     position: PiecePosition,
     has_moved: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Board {
     pub board: [[Option<Box<dyn ChessPiece>>;8];8],
+    pub en_passant_square: Option<PiecePosition>,
+    pub half_move_timer_50: u8,
+    pub half_move_number: u16,
+    pub white_mating_material: u8,
+    pub black_mating_material: u8,
 }
 
 impl Board {
     fn new() -> Self {
         Self {
-            board: Default::default()
+            board: Default::default(),
+            en_passant_square: None,
+            half_move_timer_50: 0,
+            half_move_number: 0,
+            white_mating_material: 0,
+            black_mating_material: 0,
         }
     }
 
@@ -223,13 +297,125 @@ impl Board {
         }
     }
     
-    fn check_castling(&self, mut pos: PiecePosition, dir: MoveDir, max_moves: usize, checked: &CheckSquares) -> bool {
-        let transition: [i8; 2] = (&dir).try_into().unwrap();
-        for _ in 0..max_moves {
+    fn check_castling(&self, mut pos: PiecePosition, attacked: &Attacked, castle_type: CastleType) -> bool {
+        let transition = match castle_type {
+            CastleType::Short => [1, 0],
+            CastleType::Long => [-1, 0],
+        };
+        for _ in 0..2 {
             pos += transition;
-            if self.get_square(pos).is_some() || pos.verify_with_checked_squares(checked).is_err() { return false };
+            if self.get_square(pos).is_some() || attacked.0.contains(&pos) { return false };
+        }
+        if castle_type == CastleType::Long {
+            pos += transition;
+            if self.get_square(pos).is_some() { return false };
         }
         true
+    }
+
+    fn set_en_passant_square(&mut self, val: Option<PiecePosition>) {
+        if let Some(sq) = self.en_passant_square {
+            let piece_option = self.board[sq.file as usize][sq.rank as usize].as_mut();
+            if let Some(piece) = piece_option {
+                piece.set_en_passantable(false);
+            }
+        }
+        self.en_passant_square = val;
+    }
+}
+
+#[derive(Debug)]
+pub struct FenNotation(pub String);
+
+impl FenNotation {
+    pub fn to_draw_fen(&self) -> String {
+        let mut split_fen = self.0.split_whitespace();
+        [split_fen.next().expect("wrong fen"), split_fen.next().expect("wrong fen"), split_fen.next().expect("wrong fen")].join(" ")
+    }
+}
+
+impl From<&Board> for FenNotation {
+    fn from(val: &Board) -> Self {
+        let mut res = String::new();
+        for file in (0..8).rev() {
+            let mut empty_counter = 0;
+            for rank in (0..8) {
+                let piece = val.get_square(PiecePosition::from(Vec2(rank, file)));
+                if let Some(p) = piece {
+                    if empty_counter != 0 {
+                        res.push_str(&empty_counter.to_string());
+                        empty_counter = 0;
+                    }
+                    res.push_str(&p.fen_piece_type().to_string());
+                } else { empty_counter += 1}
+            }
+            if empty_counter != 0 {
+                res.push_str(&empty_counter.to_string());
+                empty_counter = 0;
+            }
+            if file != 0 { res.push('/') }
+        }
+
+        res.push(' ');
+
+        match val.half_move_number % 2 {
+            0 => res.push('b'),
+            1 => res.push('w'),
+            _ => unreachable!(),
+        }
+
+        let mut castling_rights = String::new();
+        match val.get_square(PiecePosition::from(Vec2(4, 0))) {
+            Some(piece) if piece.fen_piece_type() == FenPieceType::WhiteKing && !piece.has_moved() => {
+                match val.get_square(PiecePosition::from(Vec2(7, 0))) {
+                    Some(piece) if piece.fen_piece_type() == FenPieceType::WhiteRook && !piece.has_moved() => {
+                        castling_rights.push('K')
+                    },
+                    _ => (),
+                }
+                match val.get_square(PiecePosition::from(Vec2(0, 0))) {
+                    Some(piece) if piece.fen_piece_type() == FenPieceType::WhiteRook && !piece.has_moved() => {
+                        castling_rights.push('Q')
+                    },
+                    _ => (),
+                }
+            },
+            _ => (),
+        }
+
+        res.push(' ');
+
+        match val.get_square(PiecePosition::from(Vec2(4, 7))) {
+            Some(piece) if piece.fen_piece_type() == FenPieceType::BlackKing && !piece.has_moved() => {
+                match val.get_square(PiecePosition::from(Vec2(7, 7))) {
+                    Some(piece) if piece.fen_piece_type() == FenPieceType::BlackRook && !piece.has_moved() => {
+                        castling_rights.push('k')
+                    },
+                    _ => (),
+                }
+                match val.get_square(PiecePosition::from(Vec2(0, 7))) {
+                    Some(piece) if piece.fen_piece_type() == FenPieceType::BlackRook && !piece.has_moved() => {
+                        castling_rights.push('q')
+                    },
+                    _ => (),
+                }
+            },
+            _ => (),
+        }
+
+        if castling_rights.is_empty() {
+            res.push('-');
+        } else {
+            res.push_str(&castling_rights);
+        }
+
+        res.push_str(" - ");
+        res.push_str(&val.half_move_timer_50.to_string());
+        res.push(' ');
+        let move_number = val.half_move_number / 2 + 1;
+        res.push_str(&move_number.to_string());
+
+        FenNotation(res)
     }
 }
 
@@ -244,18 +430,52 @@ impl TryFrom<[[&str; 8]; 8]> for Board {
                 let rank = j as i8;
                 match val[7 - j][i] {
                     "" | " " | "." => (),
-                    "p" => res.board[i][j] = Some(Box::new(Pawn { color: Color::Black, position: PiecePosition::new(file, rank), enpassantable: false})),
-                    "n" => res.board[i][j] = Some(Box::new(Knight { color: Color::Black, position: PiecePosition::new(file, rank)})),
-                    "b" => res.board[i][j] = Some(Box::new(Bishop { color: Color::Black, position: PiecePosition::new(file, rank)})),
-                    "r" => res.board[i][j] = Some(Box::new(Rook { color: Color::Black, position: PiecePosition::new(file, rank), has_moved: false})),
-                    "q" => res.board[i][j] = Some(Box::new(Queen { color: Color::Black, position: PiecePosition::new(file, rank)})),
-                    "k" => res.board[i][j] = Some(Box::new(King { color: Color::Black, position: PiecePosition::new(file, rank), has_moved: false})),
-                    "P" => res.board[i][j] = Some(Box::new(Pawn { color: Color::White, position: PiecePosition::new(file, rank), enpassantable: false})),
-                    "N" => res.board[i][j] = Some(Box::new(Knight { color: Color::White, position: PiecePosition::new(file, rank)})),
-                    "B" => res.board[i][j] = Some(Box::new(Bishop { color: Color::White, position: PiecePosition::new(file, rank)})),
-                    "R" => res.board[i][j] = Some(Box::new(Rook { color: Color::White, position: PiecePosition::new(file, rank), has_moved: false})),
-                    "Q" => res.board[i][j] = Some(Box::new(Queen { color: Color::White, position: PiecePosition::new(file, rank)})),
-                    "K" => res.board[i][j] = Some(Box::new(King { color: Color::White, position: PiecePosition::new(file, rank), has_moved: false})),
+                    "p" => res.board[i][j] = {
+                        res.black_mating_material += 3;
+                        Some(Box::new(Pawn { color: Color::Black, position: PiecePosition::new(file, rank), enpassantable: false}))
+                    },
+                    "n" => res.board[i][j] = {
+                        res.black_mating_material += 1;
+                        Some(Box::new(Knight { color: Color::Black, position: PiecePosition::new(file, rank)}))
+                    },
+                    "b" => res.board[i][j] = {
+                        res.black_mating_material += 2;
+                        Some(Box::new(Bishop { color: Color::Black, position: PiecePosition::new(file, rank)}))
+                    },
+                    "r" => res.board[i][j] = {
+                        res.black_mating_material += 3;
+                        Some(Box::new(Rook { color: Color::Black, position: PiecePosition::new(file, rank), has_moved: false}))
+                    },
+                    "q" => res.board[i][j] = {
+                        res.black_mating_material += 3;
+                        Some(Box::new(Queen { color: Color::Black, position: PiecePosition::new(file, rank)}))
+                    },
+                    "k" => res.board[i][j] = {
+                        Some(Box::new(King { color: Color::Black, position: PiecePosition::new(file, rank), has_moved: false}))
+                    },
+                    "P" => res.board[i][j] = {
+                        res.white_mating_material += 3;
+                        Some(Box::new(Pawn { color: Color::White, position: PiecePosition::new(file, rank), enpassantable: false}))
+                    },
+                    "N" => res.board[i][j] = {
+                        res.white_mating_material += 1;
+                        Some(Box::new(Knight { color: Color::White, position: PiecePosition::new(file, rank)}))
+                    },
+                    "B" => res.board[i][j] = {
+                        res.white_mating_material += 2;
+                        Some(Box::new(Bishop { color: Color::White, position: PiecePosition::new(file, rank)}))
+                    },
+                    "R" => res.board[i][j] = {
+                        res.white_mating_material += 3;
+                        Some(Box::new(Rook { color: Color::White, position: PiecePosition::new(file, rank), has_moved: false}))
+                    },
+                    "Q" => res.board[i][j] = {
+                        res.white_mating_material += 3;
+                        Some(Box::new(Queen { color: Color::White, position: PiecePosition::new(file, rank)}))
+                    },
+                    "K" => res.board[i][j] = {
+                        Some(Box::new(King { color: Color::White, position: PiecePosition::new(file, rank), has_moved: false}))
+                    },
                     _ => return Err(BoardError::ConversionFailure),
                 }
             }
@@ -285,45 +505,12 @@ pub enum BoardError {
     ConversionFailure,
 }
 
-#[derive(Debug)]
-pub struct Move {
-    pub piece: PieceType,
-    pub from: PiecePosition,
-    pub to: PiecePosition,
-}
-
-impl Display for Move {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let piece_letter = self.piece;
-        let file_letter = (self.to.file as u8 + 97) as char;
-        let rank_number = self.to.rank + 1;
-        write!(f, "{piece_letter}{file_letter}{rank_number}")
-    }
-}
-
-impl Move {
-    fn new(piece: PieceType, from: PiecePosition, to: PiecePosition) -> Self {
-        Self {
-            piece,
-            from,
-            to,
-        }
-    }
-
-    fn new_relative(piece: PieceType, from: PiecePosition, coords: [i8; 2]) -> Self {
-        Self {
-            piece,
-            from,
-            to: from + coords,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
-enum MoveError {
+pub enum MoveError {
     OutOfBounds,
     MoveBlocked,
     MoveFilteredOut,
+    PieceNotFound,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -375,18 +562,19 @@ impl From<&PinDir> for MoveDirs {
             PinDir::Vertical => MoveDirs(BTreeSet::from([MoveDir::Up, MoveDir::Down])),
             PinDir::Horizontal => MoveDirs(BTreeSet::from([MoveDir::Left, MoveDir::Right])),
             PinDir::LeftDiagonal => MoveDirs(BTreeSet::from([MoveDir::DownRight, MoveDir::UpLeft])),
-            PinDir::RightDiagonal => MoveDirs(BTreeSet::from([MoveDir::DownLeft, MoveDir::UpRight]))
+            PinDir::RightDiagonal => MoveDirs(BTreeSet::from([MoveDir::DownLeft, MoveDir::UpRight])),
+            PinDir::EnPassantBlock => MoveDirs(BTreeSet::from([MoveDir::Up, MoveDir::Down, MoveDir::UpRight, MoveDir::DownLeft, MoveDir::Right, MoveDir::Left, MoveDir::DownRight, MoveDir::UpLeft])),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct Moves(pub Vec<Move>);
+pub struct Moves(pub Vec<Box<dyn ChessMove>>);
 
 impl Display for Moves {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for i in 0..self.0.len() {
-            let _ = write!(f, "{}, ", &self.0[i]);
+            let _ = write!(f, "{}. {}, ", i, &self.0[i]);
         }
         Ok(())
     }
@@ -410,31 +598,52 @@ impl Moves {
         res
     }
 
-    fn add_move(&mut self, board: &Board, start_pos: PiecePosition, coords: [i8; 2], piece_type: PieceType, restrictions: &MoveRestrictionData) -> Result<(), MoveError> {
+    fn add_move(&mut self, board: &Board, start_pos: PiecePosition, coords: [i8; 2], piece_type: PieceType, restrictions: &MoveRestrictionData, color: Color) -> Result<(), MoveError> {
         let destination = start_pos + coords;
         let _ = destination.verify_bounds()?;
-        if board.get_square(start_pos + coords).is_none() {
+        if board.get_square(destination).is_none() {
             match piece_type {
                 PieceType::King => destination.verify_with_attacked_squares(&restrictions.attacked)?,
                 _ => destination.verify_with_checked_squares(&restrictions.check_squares)?,
             }
-            Ok((*self).0.push(Move::new(piece_type, start_pos, destination)))
-        } else { Err(MoveError::MoveBlocked) }
+            if piece_type == PieceType::Pawn && ((start_pos.rank == WHITE_PROMOTION_RANK && color == Color::White) || (start_pos.rank == BLACK_PROMOTION_RANK && color == Color::Black)) {
+                (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Queen, color)));
+                (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Knight, color)));
+                (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Bishop, color)));
+                (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Rook, color)));
+            } else {
+                (*self).0.push(Box::new(Move::new(piece_type, start_pos, destination)));
+            }
+        } else { return Err(MoveError::MoveBlocked) }
+        Ok(())
     }
 
     fn add_capture(&mut self, board: &Board, color: Color, start_pos: PiecePosition, coords: Vec2, piece_type: PieceType, restrictions: &MoveRestrictionData) -> () {
         let destination = start_pos + coords;
         if destination.verify_bounds().is_err() { return }
         let piece = board.get_square(destination);
+        let is_legal = match piece_type {
+            PieceType::King => destination.verify_with_attacked_squares(&restrictions.attacked).is_ok(),
+            _ => destination.verify_with_checked_squares(&restrictions.check_squares).is_ok(),
+        };
         match piece {
-            Some(x) if x.color() != color && destination.verify_with_checked_squares(&restrictions.check_squares).is_ok() => (*self).0.push(Move::new(piece_type, start_pos, destination)),
+            Some(x) if x.color() != color && is_legal => {
+                if piece_type == PieceType::Pawn && ((start_pos.rank == WHITE_PROMOTION_RANK && color == Color::White) || (start_pos.rank == BLACK_PROMOTION_RANK && color == Color::Black)) {
+                    (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Queen, color)));
+                    (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Knight, color)));
+                    (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Bishop, color)));
+                    (*self).0.push(Box::new(PromotionMove::new(start_pos, destination, move_register::PromotedPieceType::Rook, color)));
+                } else {
+                    (*self).0.push(Box::new(Capture::new(piece_type, start_pos, destination)));
+                }
+            },
             _ => (),
         }
     }
 
     fn add_special_moves(&mut self, board: &Board, start_pos: PiecePosition, coords: &[[i8; 2]], piece_type: PieceType, restrictions: &MoveRestrictionData, color: Color) {
         for elem in coords {
-            let _ = self.add_move(board, start_pos, *elem, piece_type, restrictions);
+            let _ = self.add_move(board, start_pos, *elem, piece_type, restrictions, color);
             let _ = self.add_capture(board, color, start_pos, Vec2::from(*elem), piece_type, restrictions);
         }
     }
@@ -447,7 +656,7 @@ impl Moves {
             for i in 1..(max_moves + 1) {
                 prev_move_coords = move_coords;
                 move_coords += translation * (i as i8);
-                match self.add_move(board, start_pos, (translation * (i as i8)).into(), piece_type, restrictions) {
+                match self.add_move(board, start_pos, (translation * (i as i8)).into(), piece_type, restrictions, color) {
                     Err(MoveError::OutOfBounds) => break,
                     Err(MoveError::MoveBlocked) => {
                         if piece_type != PieceType::Pawn {
@@ -476,9 +685,11 @@ impl Moves {
             translation.1 = 0;
             let piece = board.get_square(start_pos + translation);
             match piece {
-                Some(x) if x.color() != color && x.is_enpassantable() && destination.verify_with_checked_squares(&restrictions.check_squares).is_ok() => {
-                    let the_move = Move::new(PieceType::Pawn, start_pos, destination);
-                    (*self).0.push(the_move);
+                Some(x) if x.color() != color && x.is_enpassantable()
+                && (destination.verify_with_checked_squares(&restrictions.check_squares).is_ok()
+                || destination.verify_with_en_passant_checked_square(&restrictions.en_passant_check).is_ok()) => {
+                    let the_move = EnPassantMove::new(start_pos, destination);
+                    (*self).0.push(Box::new(the_move));
                 },
                 _ => (),
             }
@@ -488,30 +699,30 @@ impl Moves {
     fn add_castling(&mut self, board: &Board, start_pos: PiecePosition, restrictions: &MoveRestrictionData, color: Color) {
         let legal_start_positions: HashSet<Vec2> = HashSet::from([Vec2(4, 0), Vec2(4, 7)]);
         if !legal_start_positions.contains(&Vec2::from(start_pos)) { return }
-        if start_pos.verify_with_checked_squares(&restrictions.check_squares).is_err() { return }
-        if board.check_castling(start_pos, MoveDir::Right, 2, &restrictions.check_squares) {
+        if restrictions.check_squares.1 != 0 { return }
+        if board.check_castling(start_pos, &restrictions.attacked, CastleType::Short) {
             let piece = board.get_square(start_pos + [3, 0]);
             let destination = start_pos + [2, 0];
             match piece {
                 Some(x) if !x.has_moved() && x.piece_type() == PieceType::Rook && x.color() == color && destination.verify_with_checked_squares(&restrictions.check_squares).is_ok() => {
-                    (*self).0.push(Move::new(PieceType::King, start_pos, destination))
+                    (*self).0.push(Box::new(CastleMove::new(CastleType::Short, start_pos)))
                 },
                 _ => (),
             }
         }
-        if !board.check_castling(start_pos, MoveDir::Left, 3, &restrictions.check_squares) { return };
+        if !board.check_castling(start_pos, &restrictions.attacked, CastleType::Long) { return };
         let piece = board.get_square(start_pos + [-4, 0]);
         let destination = start_pos + [-2, 0];
         match piece {
             Some(x) if !x.has_moved() && x.piece_type() == PieceType::Rook && x.color() == color && destination.verify_with_checked_squares(&restrictions.check_squares).is_ok() => {
-                (*self).0.push(Move::new(PieceType::King, start_pos, destination))
+                (*self).0.push(Box::new(CastleMove::new(CastleType::Long, start_pos)))
             },
             _ => (),
         }
     }
 }
 
-pub struct Attacked(HashSet<PiecePosition>);
+pub struct Attacked(pub HashSet<PiecePosition>);
 
 impl Display for Attacked {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -536,7 +747,7 @@ impl Attacked {
         res
     }
 
-    fn add_attacked_series(&mut self, board: &Board, start_pos: PiecePosition, dirs: &[MoveDir], max_moves: usize) {
+    fn add_attacked_series(&mut self, board: &Board, start_pos: PiecePosition, dirs: &[MoveDir], max_moves: usize, color: Color) {
         for direction in dirs {
             let mut move_coords = start_pos;
             let translation: [i8; 2] = <&MoveDir as TryInto<[i8; 2]>>::try_into(direction).unwrap();
@@ -545,7 +756,10 @@ impl Attacked {
                 if let Ok(_) = move_coords.verify_bounds() {
                     self.0.insert(move_coords);
                 } else { break }
-                if board.get_square(move_coords).is_some() { break };
+                match board.get_square(move_coords) {
+                    Some(piece) if piece.piece_type() != PieceType::King || piece.color() == color => break,
+                    _ => (),
+                };
             }
         }
     }
@@ -560,7 +774,8 @@ impl Attacked {
     }
 }
 
-pub struct CheckSquares(HashSet<PiecePosition>, u8);
+pub struct CheckSquares(HashSet<PiecePosition>, pub u8);
+pub struct EnPassantCheckSquare(Option<PiecePosition>);
 
 impl Display for CheckSquares {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -609,7 +824,38 @@ impl CheckSquares {
     }
 }
 
-pub struct PinSquares(HashMap<PiecePosition, PinDir>);
+impl EnPassantCheckSquare {
+    pub fn get_all_en_passant_check_squares(board: &Board, color: Color) -> Self {
+        let mut res = EnPassantCheckSquare(None);
+        for i in 0..board.board.len() {
+            for j in 0..board.board[i].len() {
+                match &board.board[i][j] {
+                    Some(s) if s.color() == color => s.get_en_passant_checked(board, &mut res),
+                    _ => (),
+                }
+            }
+        }
+        res
+    }
+
+    fn get_en_passantable_check_square(&mut self, board: &Board, start_pos: PiecePosition, color: Color) {
+        let (captures, en_passant_square) = match color {
+            Color::White => ([[-1, 1], [1, 1]], [0, -1]),
+            Color::Black => ([[-1, -1], [1, -1]], [0, 1]),
+        };
+        for capture in captures {
+            match board.get_square(start_pos + capture) {
+                Some(piece) if piece.piece_type() == PieceType::King && piece.color() != color => {
+                    self.0 = Some(start_pos + en_passant_square);
+                    return;
+                },
+                _ => (),
+            }
+        }
+    }
+}
+
+pub struct PinSquares(pub HashMap<PiecePosition, PinDir>);
 
 impl Display for PinSquares {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -636,6 +882,7 @@ impl PinSquares {
 
     fn get_pins_from_a_piece(&mut self, board: &Board, start_pos: PiecePosition, dirs: &[MoveDir], color: Color, max_moves: usize) {
         for direction in dirs {
+            let mut en_passant_edge_case = None;
             let translation = <&MoveDir as TryInto<[i8; 2]>>::try_into(direction).unwrap();
             let mut move_coords = start_pos;
             let mut temp_res: Vec<PiecePosition> = vec![move_coords];
@@ -646,6 +893,10 @@ impl PinSquares {
                 match board.get_square(move_coords) {
                     Some(piece) if piece.color() != color && piece.piece_type() == PieceType::King => {
                         if pieces.len() == 0 { break } else {
+                            if let Some(sq) = en_passant_edge_case {
+                                self.0.insert(sq, PinDir::EnPassantBlock);
+                                return
+                            }
                             temp_res.into_iter().for_each(|piece| {
                                 self.0.insert(piece, <&MoveDir as Into<PinDir>>::into(direction));
                             });
@@ -665,10 +916,14 @@ impl PinSquares {
                             if let Some(n) = board.get_square(move_coords + translation) {
                                 if n.piece_type() == PieceType::Pawn && n.color() != color {
                                     pawn_neighbors += 1;
+                                    en_passant_edge_case = Some(move_coords + translation);
                                 }
                             };
                         }
-                        if pawn_neighbors == 0 { break }
+                        // println!("Amount of pawn neighbors: {}", pawn_neighbors);
+                        if pawn_neighbors != 1 {
+                            break
+                        }
                     },
                     Some(_) => break,
                     _ => { temp_res.push(move_coords) },
@@ -678,12 +933,13 @@ impl PinSquares {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum PinDir {
     Vertical,
     Horizontal,
     LeftDiagonal,
     RightDiagonal,
+    EnPassantBlock,
 }
 
 impl From<&MoveDir> for PinDir {
@@ -700,6 +956,7 @@ impl From<&MoveDir> for PinDir {
 pub struct MoveRestrictionData {
     pub attacked: Attacked,
     pub check_squares: CheckSquares,
+    pub en_passant_check: EnPassantCheckSquare,
     pub pin_squares: PinSquares,
 }
 
@@ -708,28 +965,40 @@ impl MoveRestrictionData {
         Self {
             attacked: Attacked::get_attacked_squares(board, color),
             check_squares: CheckSquares::get_all_checked_squares(board, color),
+            en_passant_check: EnPassantCheckSquare::get_all_en_passant_check_squares(board, color),
             pin_squares: PinSquares::get_all_pin_squares(board, color),
         }
     }
 }
 
-pub trait ChessPiece: fmt::Display + fmt::Debug {
+pub trait ChessPiece: fmt::Display + fmt::Debug + DynClone {
     fn get_moves(&self, board: &Board, moves: &mut Moves, restriction: &MoveRestrictionData);
     fn get_attacked(&self, board: &Board, attacked: &mut Attacked);
     fn get_checked(&self, board: &Board, checked: &mut CheckSquares) {}
+    fn get_en_passant_checked(&self, board: &Board, checked: &mut EnPassantCheckSquare) {}
     fn get_pins(&self, board: &Board, pins: &mut PinSquares) {}
     fn color(&self) -> Color;
     fn is_enpassantable(&self) -> bool { false }
     fn has_moved(&self) -> bool { false }
     fn piece_type(&self) -> PieceType;
+    fn fen_piece_type(&self) -> FenPieceType;
     fn position(&self) -> PiecePosition;
     fn pin_direction<'a>(&'a self, data: &'a MoveRestrictionData) -> Option<&'a PinDir> {
         data.pin_squares.0.get(&self.position())
     }
+    fn can_promote(&self) -> bool { false }
+    fn set_position(&mut self, pos: PiecePosition) -> ();
+    fn set_en_passantable(&mut self, val: bool) -> () {}
+    fn set_moved(&mut self, val: bool) -> () {}
+    fn mating_material_points(&self) -> u8 { 3 }
 }
+
+dyn_clone::clone_trait_object!(ChessPiece);
 
 const WHITE_PAWN_DOUBLE_MOVE_RANK: i8 = 1;
 const BLACK_PAWN_DOUBLE_MOVE_RANK: i8 = 6;
+const WHITE_PROMOTION_RANK: i8 = 6;
+const BLACK_PROMOTION_RANK: i8 = 1;
 const MAX_MOVES_IN_A_SERIES: usize = 7;
 
 const WHITE_PAWN_MOVES: [MoveDir; 1] = [MoveDir::Up];
@@ -758,7 +1027,9 @@ impl ChessPiece for Pawn {
                 let series_length = if self.position.rank == WHITE_PAWN_DOUBLE_MOVE_RANK { 2 } else { 1 };
                 moves.add_move_series(board, self.position, self.color, &white_moves, self.piece_type(), series_length, restrictions);
                 moves.add_captures(board, self.position, self.color, &white_captures, self.piece_type(), restrictions);
-                moves.add_en_passant(board, self.position, self.color, &white_captures, restrictions);
+                if !(pin_direction == Some(&PinDir::EnPassantBlock)) {
+                    moves.add_en_passant(board, self.position, self.color, &white_captures, restrictions);
+                }
             },
             Color::Black => {
                 let black_moves = MoveDirs(BTreeSet::from(BLACK_PAWN_MOVES)).intersection_with_pin_dir(pin_direction);
@@ -766,7 +1037,9 @@ impl ChessPiece for Pawn {
                 let series_length = if self.position.rank == BLACK_PAWN_DOUBLE_MOVE_RANK { 2 } else { 1 };
                 moves.add_move_series(board, self.position, self.color, &black_moves, self.piece_type(), series_length, restrictions);
                 moves.add_captures(board, self.position, self.color, &black_captures, self.piece_type(), restrictions);
-                moves.add_en_passant(board, self.position, self.color, &black_captures, restrictions);
+                if !(pin_direction == Some(&PinDir::EnPassantBlock)) {
+                    moves.add_en_passant(board, self.position, self.color, &black_captures, restrictions);
+                }
             },
         };
     }
@@ -776,6 +1049,18 @@ impl ChessPiece for Pawn {
             Color::White => attacked.insert_attacked_squares_relative(self.position, &[[-1, 1], [1, 1]]),
             Color::Black => attacked.insert_attacked_squares_relative(self.position, &[[-1, -1], [1, -1]]),
         }
+    }
+
+    fn get_checked(&self, board: &Board, checked: &mut CheckSquares) {
+        match self.color {
+            Color::White => checked.get_checked_from_a_piece(board, self.position, &WHITE_PAWN_CAPTURES, self.color, 1),
+            Color::Black => checked.get_checked_from_a_piece(board, self.position, &BLACK_PAWN_CAPTURES, self.color, 1),
+        }
+    }
+
+    fn get_en_passant_checked(&self, board: &Board, checked: &mut EnPassantCheckSquare) {
+        if !self.enpassantable { return }
+        checked.get_en_passantable_check_square(board, self.position, self.color);
     }
 
     fn color(&self) -> Color {
@@ -790,12 +1075,31 @@ impl ChessPiece for Pawn {
         PieceType::Pawn
     }
 
+    fn fen_piece_type(&self) -> FenPieceType {
+        match self.color {
+            Color::White => FenPieceType::WhitePawn,
+            Color::Black => FenPieceType::BlackPawn,
+        }
+    }
+
     fn has_moved(&self) -> bool {
         false
     }
 
     fn position(&self) -> PiecePosition {
         self.position
+    }
+
+    fn can_promote(&self) -> bool {
+        (self.position.rank == WHITE_PROMOTION_RANK && self.color == Color::White) || (self.position.rank == BLACK_PROMOTION_RANK && self.color == Color::Black)
+    }
+
+    fn set_position(&mut self, pos: PiecePosition) -> () {
+        self.position = pos;
+    }
+
+    fn set_en_passantable(&mut self, val: bool) -> () {
+        self.enpassantable = val;
     }
 }
 
@@ -818,6 +1122,21 @@ impl ChessPiece for Knight {
         attacked.insert_attacked_squares_relative(self.position, &KNIGHT_MOVES);
     }
 
+    fn get_checked(&self, board: &Board, checked: &mut CheckSquares) {
+        for translation in KNIGHT_MOVES {
+            let destination = self.position + translation;
+            if let Err(_) = destination.verify_bounds() { continue }
+            match board.get_square(destination) {
+                Some(piece) if piece.piece_type() == PieceType::King && piece.color() != self.color => {
+                    checked.0.insert(self.position);
+                    checked.1 += 1;
+                    return
+                },
+                _ => (),
+            }
+        }
+    }
+
     fn color(&self) -> Color {
         self.color
     }
@@ -826,9 +1145,22 @@ impl ChessPiece for Knight {
         PieceType::Knight
     }
 
+    fn fen_piece_type(&self) -> FenPieceType {
+        match self.color {
+            Color::White => FenPieceType::WhiteKnight,
+            Color::Black => FenPieceType::BlackKnight,
+        }
+    }
+
     fn position(&self) -> PiecePosition {
         self.position
     }
+
+    fn set_position(&mut self, pos: PiecePosition) -> () {
+        self.position = pos;
+    }
+
+    fn mating_material_points(&self) -> u8 { 1 }
 }
 
 impl Display for Knight {
@@ -863,9 +1195,26 @@ impl ChessPiece for King {
         PieceType::King
     }
 
+    fn fen_piece_type(&self) -> FenPieceType {
+        match self.color {
+            Color::White => FenPieceType::WhiteKing,
+            Color::Black => FenPieceType::BlackKing,
+        }
+    }
+
     fn position(&self) -> PiecePosition {
         self.position
     }
+
+    fn set_position(&mut self, pos: PiecePosition) -> () {
+        self.position = pos;
+    }
+
+    fn set_moved(&mut self, val: bool) -> () {
+        self.has_moved = val;
+    }
+
+    fn mating_material_points(&self) -> u8 { 0 }
 }
 
 impl Display for King {
@@ -885,7 +1234,7 @@ impl ChessPiece for Rook {
     }
 
     fn get_attacked(&self, board: &Board, attacked: &mut Attacked) {
-        attacked.add_attacked_series(board, self.position, &ROOK_MOVES, MAX_MOVES_IN_A_SERIES)
+        attacked.add_attacked_series(board, self.position, &ROOK_MOVES, MAX_MOVES_IN_A_SERIES, self.color)
     }
 
     fn get_checked(&self, board: &Board, checked: &mut CheckSquares) {
@@ -908,8 +1257,23 @@ impl ChessPiece for Rook {
         PieceType::Rook
     }
 
+    fn fen_piece_type(&self) -> FenPieceType {
+        match self.color {
+            Color::White => FenPieceType::WhiteRook,
+            Color::Black => FenPieceType::BlackRook,
+        }
+    }
+
     fn position(&self) -> PiecePosition {
         self.position
+    }
+
+    fn set_position(&mut self, pos: PiecePosition) -> () {
+        self.position = pos;
+    }
+
+    fn set_moved(&mut self, val: bool) -> () {
+        self.has_moved = val;
     }
 }
 
@@ -930,7 +1294,7 @@ impl ChessPiece for Bishop {
     }
 
     fn get_attacked(&self, board: &Board, attacked: &mut Attacked) {
-        attacked.add_attacked_series(board, self.position, &BISHOP_MOVES, MAX_MOVES_IN_A_SERIES)
+        attacked.add_attacked_series(board, self.position, &BISHOP_MOVES, MAX_MOVES_IN_A_SERIES, self.color)
     }
 
     fn get_checked(&self, board: &Board, checked: &mut CheckSquares) {
@@ -949,9 +1313,22 @@ impl ChessPiece for Bishop {
         PieceType::Bishop
     }
 
+    fn fen_piece_type(&self) -> FenPieceType {
+        match self.color {
+            Color::White => FenPieceType::WhiteBishop,
+            Color::Black => FenPieceType::BlackBishop,
+        }
+    }
+
     fn position(&self) -> PiecePosition {
         self.position
     }
+
+    fn set_position(&mut self, pos: PiecePosition) -> () {
+        self.position = pos;
+    }
+
+    fn mating_material_points(&self) -> u8 { 2 }
 }
 
 impl Display for Bishop {
@@ -971,7 +1348,7 @@ impl ChessPiece for Queen {
     }
 
     fn get_attacked(&self, board: &Board, attacked: &mut Attacked) {
-        attacked.add_attacked_series(board, self.position, &QUEEN_MOVES, MAX_MOVES_IN_A_SERIES)
+        attacked.add_attacked_series(board, self.position, &QUEEN_MOVES, MAX_MOVES_IN_A_SERIES, self.color)
     }
 
     fn get_checked(&self, board: &Board, checked: &mut CheckSquares) {
@@ -990,8 +1367,19 @@ impl ChessPiece for Queen {
         PieceType::Queen
     }
 
+    fn fen_piece_type(&self) -> FenPieceType {
+        match self.color {
+            Color::White => FenPieceType::WhiteQueen,
+            Color::Black => FenPieceType::BlackQueen,
+        }
+    }
+
     fn position(&self) -> PiecePosition {
         self.position
+    }
+
+    fn set_position(&mut self, pos: PiecePosition) -> () {
+        self.position = pos;
     }
 }
 
