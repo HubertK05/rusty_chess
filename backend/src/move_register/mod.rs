@@ -160,8 +160,10 @@ impl ChessMove for Move {
         if piece.piece_type() == PieceType::Pawn { board.half_move_timer_50 = 0 } else { board.half_move_timer_50 += 1 };
         piece.set_position(self.to);
         let en_passant_square = if self.is_double_pawn_move() {
-            piece.set_en_passantable(true);
-            Some(self.to)
+            match piece.color() {
+                Color::White => Some(self.to + Vec2(0, -1)),
+                Color::Black => Some(self.to + Vec2(0, 1)),
+            }
         } else { None };
         board.set_en_passant_square(en_passant_square);
         // set moved

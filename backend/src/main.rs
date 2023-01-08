@@ -3,14 +3,15 @@ use std::{io, collections::HashMap};
 use backend::{Board, Moves, Color, CheckSquares, FenNotation};
 
 fn main() {
-    let mut board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
+    let mut board = Board::try_from(FenNotation("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1".into())).unwrap();
+    // let mut board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
     // println!("{}, {:?}", &board, &board);
 
     let mut repetition_map: HashMap<String, u8> = HashMap::new();
     repetition_map.insert("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq".into(), 1);
     loop {
         println!("{board}");
-
+        println!("{:?}", &board);
         let color = board.turn;
 
         let opponent_color = color.opp();
