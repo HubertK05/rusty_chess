@@ -1,4 +1,4 @@
-﻿use backend::{Board, Moves, move_register::MoveType, FenNotation};
+﻿use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::Moves, move_register::models::MoveType};
 
 fn test_count_moves(board: &Board, depth: u8, max_depth: u8) -> (u64, u64, u64) {
     let move_set = Moves::get_all_moves(&board, board.turn);
