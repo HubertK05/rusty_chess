@@ -2,11 +2,14 @@ use std::fmt;
 
 use dyn_clone::DynClone;
 
-use crate::{board_setup::models::{Board, FenPieceType}, move_register::models::{MoveError, ChessMove, Move, Capture, PromotionMove, PromotedPieceType, PromotionCapture, EnPassantMove, MoveType}};
+use crate::{board_setup::models::{Board, FenPieceType, AvailableCastles}, move_register::models::{MoveError, ChessMove, Move, Capture, PromotionMove, PromotedPieceType, PromotionCapture, EnPassantMove, MoveType, CastleMove, CastleType}};
+use crate::move_generator::utils::ContainsFrom;
 
-use self::models::{Moves, MoveRestrictionData, Attacked, CheckSquares, EnPassantCheckSquare, PinSquares, Color, PieceType, Square, Pawn, MoveDir, Offset, CheckedAdd, Rook, Bishop, Queen, Knight, King};
+use self::{models::{Moves, MoveRestrictionData, Attacked, CheckSquares, EnPassantCheckSquare, PinSquares, Color, PieceType, Square, Pawn, MoveDir, Offset, CheckedAdd, Rook, Bishop, Queen, Knight, King, PinDir}, restrictions::{filter_with_checked, filter_with_pins}};
 
 pub mod models;
+pub mod restrictions;
+pub mod utils;
 
 pub trait ChessPiece: fmt::Display + fmt::Debug + DynClone {
     fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<Box<dyn ChessMove>>;
@@ -51,10 +54,19 @@ const QUEEN_MOVES: [MoveDir; 8] = [MoveDir::Up, MoveDir::Down, MoveDir::Left, Mo
 
 impl ChessPiece for Pawn {
     fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<Box<dyn ChessMove>> {
-        let mut a = get_pawn_moves(board, self.position, self.color);
-        a.extend(get_pawn_captures(board, self.position, self.color));
-        a.extend(get_en_passant(board, self.position, self.color));
-        a
+        let mut all_moves = get_pawn_moves(board, self.position, self.color);
+        all_moves.extend(get_pawn_captures(board, self.position, self.color));
+
+        let mut all_moves = filter_with_checked(all_moves, &restriction.check_squares);
+
+        let en_passant = get_en_passant(board, self.position, self.color);
+        if let Some(ep) = &en_passant {
+            if restriction.pin_squares.0.get(&ep.from()) != Some(&PinDir::EnPassantBlock) {
+                all_moves.extend(en_passant);
+            }
+        };
+
+        filter_with_pins(all_moves, &restriction.pin_squares)
     }
 
     fn color(&self) -> Color {
@@ -83,11 +95,12 @@ impl ChessPiece for Pawn {
 
 impl ChessPiece for Rook {
     fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<Box<dyn ChessMove>> {
-        let mut a: Vec<Box<dyn ChessMove>> = Vec::new();
+        let mut all_moves: Vec<Box<dyn ChessMove>> = Vec::new();
         for dir in ROOK_MOVES {
-            a.extend(get_move_series(board, self.position, dir, MAX_MOVES_IN_A_SERIES as u8, self));
+            all_moves.extend(get_move_series(board, self.position, dir, MAX_MOVES_IN_A_SERIES as u8, self));
         }
-        a
+        let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
+        filter_with_checked(all_moves, &restriction.check_squares)
     }
 
     fn color(&self) -> Color {
@@ -116,11 +129,12 @@ impl ChessPiece for Rook {
 
 impl ChessPiece for Bishop {
     fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<Box<dyn ChessMove>> {
-        let mut a: Vec<Box<dyn ChessMove>> = Vec::new();
+        let mut all_moves: Vec<Box<dyn ChessMove>> = Vec::new();
         for dir in BISHOP_MOVES {
-            a.extend(get_move_series(board, self.position, dir, MAX_MOVES_IN_A_SERIES as u8, self));
+            all_moves.extend(get_move_series(board, self.position, dir, MAX_MOVES_IN_A_SERIES as u8, self));
         }
-        a
+        let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
+        filter_with_checked(all_moves, &restriction.check_squares)
     }
 
     fn color(&self) -> Color {
@@ -149,11 +163,12 @@ impl ChessPiece for Bishop {
 
 impl ChessPiece for Queen {
     fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<Box<dyn ChessMove>> {
-        let mut a: Vec<Box<dyn ChessMove>> = Vec::new();
+        let mut all_moves: Vec<Box<dyn ChessMove>> = Vec::new();
         for dir in QUEEN_MOVES {
-            a.extend(get_move_series(board, self.position, dir, MAX_MOVES_IN_A_SERIES as u8, self));
+            all_moves.extend(get_move_series(board, self.position, dir, MAX_MOVES_IN_A_SERIES as u8, self));
         }
-        a
+        let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
+        filter_with_checked(all_moves, &restriction.check_squares)
     }
 
     fn color(&self) -> Color {
@@ -182,11 +197,12 @@ impl ChessPiece for Queen {
 
 impl ChessPiece for Knight {
     fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<Box<dyn ChessMove>> {
-        let mut a: Vec<Box<dyn ChessMove>> = Vec::new();
+        let mut all_moves: Vec<Box<dyn ChessMove>> = Vec::new();
         for offset in KNIGHT_MOVES {
-            a.extend(get_move(board, self.position, offset, self));
+            all_moves.extend(get_move(board, self.position, offset, self));
         }
-        a
+        let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
+        filter_with_checked(all_moves, &restriction.check_squares)
     }
 
     fn color(&self) -> Color {
@@ -215,11 +231,19 @@ impl ChessPiece for Knight {
 
 impl ChessPiece for King {
     fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<Box<dyn ChessMove>> {
-        let mut a: Vec<Box<dyn ChessMove>> = Vec::new();
+        let mut all_moves: Vec<Box<dyn ChessMove>> = Vec::new();
         for offset in KING_MOVES {
-            a.extend(get_move(board, self.position, offset, self));
+            if let Some(m) = get_move(board, self.position, offset, self) {
+                if !restriction.attacked.0.contains(&m.to()) {
+                    all_moves.push(m);
+                }
+            }
         }
-        a
+        if restriction.check_squares.checks_amount != 0 {
+            all_moves.extend(get_castles(self.position, &board.castling, &restriction.attacked, self.color));
+        }
+        
+        all_moves
     }
 
     fn color(&self) -> Color {
@@ -272,16 +296,15 @@ fn get_pawn_moves(board: &Board, start: Square, color: Color) -> Vec<Box<dyn Che
         Color::Black => (Offset::from(BLACK_PAWN_MOVE), BLACK_PAWN_DOUBLE_MOVE_RANK, BLACK_PROMOTION_RANK),
     };
 
-    let pos = <(i8, i8)>::from(start);
-    let count = if pos.0 == double_move_rank { 2 } else { 1 };
+    let count = if start.1 == double_move_rank { 2 } else { 1 };
 
     for i in 1..=count {
         if let Some(sq) = start.c_add(translation * i as i8) {
             if board.get_square(sq).is_some() {
                 break
             }
-            let (rank_number, _) = <(i8, i8)>::from(sq);
-            if rank_number == promotion_rank {
+
+            if sq.1 == promotion_rank {
                 for pp in PROMOTED_PIECE_TYPES {
                     res.push(Box::new(PromotionMove::new(start, sq, pp, color)));
                 }
@@ -311,8 +334,7 @@ fn get_pawn_captures(board: &Board, start: Square, color: Color) -> Vec<Box<dyn 
             continue
         };
         
-        let (rank_number, _) = <(i8, i8)>::from(sq);
-        if p.color() != color && rank_number == promotion_rank {
+        if p.color() != color && sq.1 == promotion_rank {
             for pp in PROMOTED_PIECE_TYPES {
                 res.push(Box::new(PromotionCapture::new(start, sq, pp, color)));
             }
@@ -326,14 +348,15 @@ fn get_pawn_captures(board: &Board, start: Square, color: Color) -> Vec<Box<dyn 
 
 fn get_en_passant(board: &Board, start: Square, color: Color) -> Option<Box<dyn ChessMove>> {
     let target_sq = board.en_passant_square?;
-    if (target_sq.0 - start.0).abs() != 1 {
+    if target_sq.1 - start.1 == 0 && (target_sq.0 - start.0).abs() == 1 {
         return None;
     }
     if board.get_square(target_sq)?.color() != color {
-        match color {
-            Color::White => Some(Box::new(EnPassantMove::new(start, target_sq + 8))),
-            Color::Black => Some(Box::new(EnPassantMove::new(start, target_sq - 8))),  
-        }
+        let res = match color {
+            Color::White => Square(target_sq.0, target_sq.1 + 1),
+            Color::Black => Square(target_sq.0, target_sq.1 - 1),
+        };
+        Some(Box::new(EnPassantMove::new(start, res)))
     } else {
         None
     }
@@ -346,4 +369,22 @@ fn get_move(board: &Board, start: Square, offset: Offset, piece: &dyn ChessPiece
         Some(_) => Some(Box::new(Capture::new(piece.piece_type(), start, sq))),
         None => Some(Box::new(Move::new(piece.piece_type(), start, sq)))
     }
+}
+
+fn get_castles(pos: Square, castles: &AvailableCastles, attacked: &Attacked, color: Color) -> Vec<Box<dyn ChessMove>> {
+    let mut res: Vec<Box<dyn ChessMove>> = Vec::new();
+    let Attacked(set) = &attacked;
+    if color == Color::White && castles.white_short && !set.contains_from(&[pos + Offset(1, 0), pos + Offset(2, 0)]) {
+        res.push(Box::new(CastleMove::new(CastleType::WhiteShort)));
+    }
+    if color == Color::White && castles.white_long && !set.contains_from(&[pos + Offset(-1, 0), pos + Offset(-2, 0), pos + Offset(-3, 0)]) {
+        res.push(Box::new(CastleMove::new(CastleType::WhiteLong)));
+    }
+    if color == Color::Black && castles.black_short && !set.contains_from(&[pos + Offset(1, 0), pos + Offset(2, 0)]) {
+        res.push(Box::new(CastleMove::new(CastleType::BlackShort)));
+    }
+    if color == Color::Black && castles.black_long && !set.contains_from(&[pos + Offset(-1, 0), pos + Offset(-2, 0), pos + Offset(-3, 0)]) {
+        res.push(Box::new(CastleMove::new(CastleType::BlackLong)));
+    }
+    res
 }

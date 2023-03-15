@@ -49,14 +49,12 @@ impl Capture {
 #[derive(Debug, Clone)]
 pub struct CastleMove {
     pub castle_type: CastleType,
-    pub from: Square,
 }
 
 impl CastleMove {
-    pub fn new(castle_type: CastleType, from: Square) -> Self {
+    pub fn new(castle_type: CastleType) -> Self {
         Self {
             castle_type,
-            from,
         }
     }
 }
@@ -149,6 +147,7 @@ pub enum MoveType {
 pub trait ChessMove: std::fmt::Debug + std::fmt::Display + DynClone {
     fn register_move(&self, board: &mut Board) -> Result<(), MoveError>;
     fn is_double_pawn_move(&self) -> bool { false }
+    fn from(&self) -> Square;
     fn to(&self) -> Square;
     fn move_type(&self) -> MoveType;
 }
@@ -157,6 +156,10 @@ dyn_clone::clone_trait_object!(ChessMove);
 
 impl ChessMove for Move {
     fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
+        todo!()
+    }
+
+    fn from(&self) -> Square {
         todo!()
     }
 
@@ -174,6 +177,10 @@ impl ChessMove for Capture {
         todo!()
     }
 
+    fn from(&self) -> Square {
+        todo!()
+    }
+
     fn to(&self) -> Square {
         todo!()
     }
@@ -185,6 +192,10 @@ impl ChessMove for Capture {
 
 impl ChessMove for EnPassantMove {
     fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
+        todo!()
+    }
+
+    fn from(&self) -> Square {
         todo!()
     }
 
@@ -202,6 +213,10 @@ impl ChessMove for PromotionMove {
         todo!()
     }
 
+    fn from(&self) -> Square {
+        todo!()
+    }
+
     fn to(&self) -> Square {
         todo!()
     }
@@ -213,6 +228,28 @@ impl ChessMove for PromotionMove {
 
 impl ChessMove for PromotionCapture {
     fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
+        todo!()
+    }
+
+    fn from(&self) -> Square {
+        todo!()
+    }
+
+    fn to(&self) -> Square {
+        todo!()
+    }
+
+    fn move_type(&self) -> MoveType {
+        todo!()
+    }
+}
+
+impl ChessMove for CastleMove {
+    fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
+        todo!()
+    }
+
+    fn from(&self) -> Square {
         todo!()
     }
 
@@ -228,12 +265,10 @@ impl ChessMove for PromotionCapture {
 impl Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let piece_letter = self.piece;
-        let (from_rank_number, from_file_number) = <(i8, i8)>::from(self.from);
-        let (to_rank_number, to_file_number) = <(i8, i8)>::from(self.to);
-        let from_file_letter = (from_file_number as u8 + 97) as char;
-        let from_rank_number = from_rank_number + 1;
-        let to_file_letter = (to_file_number as u8 + 97) as char;
-        let to_rank_number = to_rank_number + 1;
+        let from_file_letter = (self.from.0 as u8 + 97) as char;
+        let from_rank_number = self.from.1 + 1;
+        let to_file_letter = (self.to.0 as u8 + 97) as char;
+        let to_rank_number = self.to.1 + 1;
         write!(f, "{piece_letter}{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}")
     }
 }
@@ -241,12 +276,10 @@ impl Display for Move {
 impl Display for Capture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let piece_letter = self.piece;
-        let (from_rank_number, from_file_number) = <(i8, i8)>::from(self.from);
-        let (to_rank_number, to_file_number) = <(i8, i8)>::from(self.to);
-        let from_file_letter = (from_file_number as u8 + 97) as char;
-        let from_rank_number = from_rank_number + 1;
-        let to_file_letter = (to_file_number as u8 + 97) as char;
-        let to_rank_number = to_rank_number + 1;
+        let from_file_letter = (self.from.0 as u8 + 97) as char;
+        let from_rank_number = self.from.1 + 1;
+        let to_file_letter = (self.to.0 as u8 + 97) as char;
+        let to_rank_number = self.to.1 + 1;
         write!(f, "{piece_letter}x{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}")
     }
 }
@@ -262,34 +295,29 @@ impl Display for CastleMove {
 
 impl Display for EnPassantMove {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (_from_rank_number, from_file_number) = <(i8, i8)>::from(self.from);
-        let (to_rank_number, to_file_number) = <(i8, i8)>::from(self.to);
-        let file_from_letter = (from_file_number as u8 + 97) as char;
-        let file_to_letter = (to_file_number as u8 + 97) as char;
-        let rank_number = to_rank_number + 1;
-        write!(f, "{file_from_letter}x{file_to_letter}{rank_number}")
+        let from_file_letter = (self.from.0 as u8 + 97) as char;
+        let to_file_letter = (self.to.0 as u8 + 97) as char;
+        let to_rank_number = self.to.1 + 1;
+        write!(f, "{from_file_letter}x{to_file_letter}{to_rank_number}")
     }
 }
 
 impl Display for PromotionMove {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (to_rank_number, to_file_number) = <(i8, i8)>::from(self.to);
-        let file_letter = (to_file_number as u8 + 97) as char;
-        let rank_number = to_rank_number + 1;
+        let to_file_letter = (self.to.0 as u8 + 97) as char;
+        let to_rank_number = self.to.1 + 1;
         let piece_letter = &self.to_piece;
-        write!(f, "{file_letter}{rank_number}={piece_letter}")
+        write!(f, "{to_file_letter}{to_rank_number}={piece_letter}")
     }
 }
 
 impl Display for PromotionCapture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (from_file_number, _) = <(i8, i8)>::from(self.from);
-        let (to_rank_number, to_file_number) = <(i8, i8)>::from(self.to);
-        let from_file_letter = (from_file_number as u8 + 97) as char;
-        let file_letter = (to_file_number as u8 + 97) as char;
-        let rank_number = to_rank_number + 1;
+        let from_file_letter = (self.from.0 as u8 + 97) as char;
+        let to_file_letter = (self.to.0 as u8 + 97) as char;
+        let to_rank_number = self.to.1 + 1;
         let piece_letter = &self.to_piece;
-        write!(f, "{from_file_letter}x{file_letter}{rank_number}={piece_letter}")
+        write!(f, "{from_file_letter}x{to_file_letter}{to_rank_number}={piece_letter}")
     }
 }
 

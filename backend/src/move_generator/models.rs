@@ -4,6 +4,8 @@ use dyn_clone::DynClone;
 
 use crate::{board_setup::models::{BoardError, Board, FenPieceType}, move_register::models::{ChessMove, MoveError}};
 
+use super::restrictions::{get_checked, get_pins, get_attacked};
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PieceType {
     Pawn,
@@ -53,14 +55,8 @@ impl ToString for Color {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Square(pub i8);
-
-impl From<Square> for (i8, i8) {
-    fn from(val: Square) -> Self {
-        (val.0 / 8, val.0 % 8)
-    }
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Square(pub i8, pub i8);
 
 pub trait CheckedAdd<T = Self> {
     type Output;
@@ -68,25 +64,27 @@ pub trait CheckedAdd<T = Self> {
     fn c_add(self, rhs: T) -> Option<Self::Output>;
 }
 
-pub trait CheckedAddAssign<T = Self> {
-    type Output;
-
-    fn c_add_assign(self, rhs: T) -> Option<Self::Output>;
-}
-
-impl Add<i8> for Square {
+impl Add<Offset> for Square {
     type Output = Self;
 
-    fn add(self, rhs: i8) -> Self::Output {
-        Self(self.0 + rhs)
+    fn add(self, rhs: Offset) -> Self::Output {
+        Self(self.0 + rhs.0, self.1 + rhs.1)
     }
 }
 
-impl Sub<i8> for Square {
+impl Sub<Offset> for Square {
     type Output = Self;
 
-    fn sub(self, rhs: i8) -> Self::Output {
-        Self(self.0 - rhs)
+    fn sub(self, rhs: Offset) -> Self::Output {
+        Self(self.0 - rhs.0, self.1 - rhs.1)
+    }
+}
+
+impl Sub for Square {
+    type Output = Offset;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Offset(self.0 - rhs.0, self.1 - rhs.1)
     }
 }
 
@@ -94,31 +92,17 @@ impl CheckedAdd<Offset> for Square {
     type Output = Self;
 
     fn c_add(self, rhs: Offset) -> Option<Self::Output> {
-        let rank_number = self.0 / 8 + rhs.0;
-        let file_number = self.0 % 8 + rhs.1;
-        if !rank_number.is_negative() && rank_number <= 7 && !file_number.is_negative() && file_number <= 7 {
-            Some(Self(rank_number * 8 + file_number))
+        let f_number = self.0 + rhs.0;
+        let r_number = self.1 + rhs.1;
+        if !f_number.is_negative() && f_number <= 7 && !r_number.is_negative() && r_number <= 7 {
+            Some(Self(f_number, r_number))
         } else {
             None
         }
     }
 }
 
-impl CheckedAddAssign<Offset> for Square {
-    type Output = Self;
-
-    fn c_add_assign(self, rhs: Offset) -> Option<Self::Output> {
-        let rank_number = self.0 / 8 + rhs.0;
-        let file_number = self.0 % 8 + rhs.1;
-        if !rank_number.is_negative() && rank_number <= 7 && !file_number.is_negative() && file_number <= 7 {
-            Some(Self(rank_number * 8 + file_number))
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Offset(pub i8, pub i8);
 
 impl Mul<i8> for Offset {
@@ -132,14 +116,14 @@ impl Mul<i8> for Offset {
 impl From<MoveDir> for Offset {
     fn from(val: MoveDir) -> Self {
         match val {
-            MoveDir::Up => Offset(1, 0),
+            MoveDir::Up => Offset(0, 1),
             MoveDir::UpRight => Offset(1, 1),
-            MoveDir::Right => Offset(0, 1),
-            MoveDir::DownRight => Offset(-1, 1),
-            MoveDir::Down => Offset(-1, 0),
+            MoveDir::Right => Offset(1, 0),
+            MoveDir::DownRight => Offset(1, -1),
+            MoveDir::Down => Offset(0, -1),
             MoveDir::DownLeft => Offset(-1, -1),
-            MoveDir::Left => Offset(0, -1),
-            MoveDir::UpLeft => Offset(1, -1),
+            MoveDir::Left => Offset(-1, 0),
+            MoveDir::UpLeft => Offset(-1, 1),
         }
     }
 }
@@ -159,14 +143,14 @@ impl TryFrom<&str> for Square {
                                 .parse::<i8>()
                                 .map_err(|_e| BoardError::ConversionFailure)? - 1;
 
-        Ok(Square(rank_number * 8 + file_number))
+        Ok(Square(file_number, rank_number))
     }
 }
 
 impl Display for Square {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let rank_number = self.0 / 8;
-        let file_number = (self.0 as u8 % 8 + 97) as char;
+        let rank_number = self.1 + 1;
+        let file_number = (self.0 as u8 + 97) as char;
         write!(f, "{}{}", file_number, rank_number)
     }
 }
@@ -254,12 +238,16 @@ impl Display for Attacked {
     }
 }
 
-pub struct CheckSquares(HashSet<Square>, pub u8);
+pub struct CheckSquares {
+    pub squares: HashSet<Square>,
+    pub checks_amount: u8,
+}
+
 pub struct EnPassantCheckSquare(Option<Square>);
 
 impl Display for CheckSquares {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for elem in self.0.iter() {
+        for elem in self.squares.iter() {
             let _ = write!(f, "{}, ", elem);
         }
         Ok(())
@@ -277,7 +265,7 @@ impl Display for PinSquares {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum PinDir {
     Vertical,
     Horizontal,
@@ -286,8 +274,8 @@ pub enum PinDir {
     EnPassantBlock,
 }
 
-impl From<&MoveDir> for PinDir {
-    fn from(val: &MoveDir) -> Self {
+impl From<MoveDir> for PinDir {
+    fn from(val: MoveDir) -> Self {
         match val {
             MoveDir::Up | MoveDir::Down => PinDir::Vertical,
             MoveDir::UpRight | MoveDir::DownLeft => PinDir::RightDiagonal,
@@ -300,20 +288,18 @@ impl From<&MoveDir> for PinDir {
 pub struct MoveRestrictionData {
     pub attacked: Attacked,
     pub check_squares: CheckSquares,
-    pub en_passant_check: EnPassantCheckSquare,
     pub pin_squares: PinSquares,
 }
 
-// impl MoveRestrictionData {
-//     pub fn new(board: &Board, color: Color) -> Self {
-//         Self {
-//             attacked: Attacked::get_attacked_squares(board, color),
-//             check_squares: CheckSquares::get_all_checked_squares(board, color),
-//             en_passant_check: EnPassantCheckSquare::get_all_en_passant_check_squares(board, color),
-//             pin_squares: PinSquares::get_all_pin_squares(board, color),
-//         }
-//     }
-// }
+impl MoveRestrictionData {
+    pub fn get(board: &Board, color: Color) -> Self {
+        Self {
+            attacked: get_attacked(board, color),
+            check_squares: get_checked(board, color),
+            pin_squares: get_pins(board, color),
+        }
+    }
+}
 
 impl Display for Pawn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -86,18 +86,27 @@ impl TryFrom<&str> for FenPieceType {
 pub struct Board {
     pub board: [[Option<Box<dyn ChessPiece>>;8];8],
     pub turn: Color,
-    pub castling: HashSet<CastleType>,
+    pub castling: AvailableCastles,
     pub en_passant_square: Option<Square>,
     pub half_move_timer_50: u8,
     pub full_move_number: u16,
     pub mating_material: (u8, u8),
+    pub king_positions: (Square, Square),
 }
 
 impl Board {
     pub fn get_square(&self, sq: Square) -> Option<&dyn ChessPiece> {
-        let (rank_number, file_number) = <(i8, i8)>::from(sq);
-        self.board.get(file_number as usize)?.get(rank_number as usize)?.as_deref()
+        let Square(file_number, rank_number) = sq;
+        self.board.get(rank_number as usize)?.get(file_number as usize)?.as_deref()
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct AvailableCastles {
+    pub white_short: bool,
+    pub white_long: bool,
+    pub black_short: bool,
+    pub black_long: bool,
 }
 
 #[derive(Debug)]
