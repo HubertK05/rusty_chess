@@ -2,7 +2,7 @@ use std::fmt;
 
 use dyn_clone::DynClone;
 
-use crate::{board_setup::models::{Board, FenPieceType, AvailableCastles}, move_register::models::{MoveError, ChessMove, Move, Capture, PromotionMove, PromotedPieceType, PromotionCapture, EnPassantMove, MoveType, CastleMove, CastleType}};
+use crate::{board_setup::models::{Board, FenPieceType, AvailableCastles}, move_register::{models::{MoveError, Move, Capture, PromotionMove, PromotedPieceType, PromotionCapture, EnPassantMove, MoveType, CastleMove, CastleType}, ChessMove}};
 use crate::move_generator::utils::ContainsFrom;
 
 use self::{models::{Moves, MoveRestrictionData, Attacked, CheckSquares, EnPassantCheckSquare, PinSquares, Color, PieceType, Square, Pawn, MoveDir, Offset, CheckedAdd, Rook, Bishop, Queen, Knight, King, PinDir}, restrictions::{filter_with_checked, filter_with_pins}};

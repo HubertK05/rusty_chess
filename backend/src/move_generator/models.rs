@@ -2,7 +2,7 @@ use std::{fmt::{Display, self}, collections::{HashSet, HashMap}, ops::{Mul, Add,
 
 use dyn_clone::DynClone;
 
-use crate::{board_setup::models::{BoardError, Board, FenPieceType}, move_register::models::{ChessMove, MoveError}};
+use crate::{board_setup::models::{BoardError, Board, FenPieceType}, move_register::{ChessMove, models::MoveError}};
 
 use super::restrictions::{get_checked, get_pins, get_attacked};
 
@@ -58,6 +58,12 @@ impl ToString for Color {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Square(pub i8, pub i8);
 
+impl Square {
+    pub fn is_in_bounds(&self) -> bool {
+        !self.0.is_negative() && self.0 <= 7 && !self.1.is_negative() && self.1 <= 7
+    }
+}
+
 pub trait CheckedAdd<T = Self> {
     type Output;
 
@@ -92,10 +98,9 @@ impl CheckedAdd<Offset> for Square {
     type Output = Self;
 
     fn c_add(self, rhs: Offset) -> Option<Self::Output> {
-        let f_number = self.0 + rhs.0;
-        let r_number = self.1 + rhs.1;
-        if !f_number.is_negative() && f_number <= 7 && !r_number.is_negative() && r_number <= 7 {
-            Some(Self(f_number, r_number))
+        let res = Self(self.0 + rhs.0, self.1 + rhs.1);
+        if res.is_in_bounds() {
+            Some(res)
         } else {
             None
         }

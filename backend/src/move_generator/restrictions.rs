@@ -1,6 +1,6 @@
 use std::collections::{HashSet, HashMap};
 
-use crate::{board_setup::models::Board, move_register::models::ChessMove};
+use crate::{board_setup::models::Board, move_register::ChessMove};
 
 use super::{models::{Square, Color, MoveDir, CheckedAdd, Offset, PieceType, CheckSquares, PinSquares, PinDir, Attacked, Moves}, MAX_MOVES_IN_A_SERIES, ChessPiece, KNIGHT_MOVES, QUEEN_MOVES};
 

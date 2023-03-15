@@ -7,8 +7,6 @@ use crate::{move_generator::models::{PieceType, Color, Square}, board_setup::mod
 #[derive(Debug, PartialEq)]
 pub enum MoveError {
     OutOfBounds,
-    MoveBlocked,
-    MoveFilteredOut,
     PieceNotFound,
 }
 
@@ -126,7 +124,7 @@ impl PromotionCapture {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum PromotedPieceType {
     Queen,
     Knight,
@@ -142,124 +140,6 @@ pub enum MoveType {
     CastleMove,
     PromotionMove,
     PromotionCapture,
-}
-
-pub trait ChessMove: std::fmt::Debug + std::fmt::Display + DynClone {
-    fn register_move(&self, board: &mut Board) -> Result<(), MoveError>;
-    fn is_double_pawn_move(&self) -> bool { false }
-    fn from(&self) -> Square;
-    fn to(&self) -> Square;
-    fn move_type(&self) -> MoveType;
-}
-
-dyn_clone::clone_trait_object!(ChessMove);
-
-impl ChessMove for Move {
-    fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
-        todo!()
-    }
-
-    fn from(&self) -> Square {
-        todo!()
-    }
-
-    fn to(&self) -> Square {
-        todo!()
-    }
-
-    fn move_type(&self) -> MoveType {
-        todo!()
-    }
-}
-
-impl ChessMove for Capture {
-    fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
-        todo!()
-    }
-
-    fn from(&self) -> Square {
-        todo!()
-    }
-
-    fn to(&self) -> Square {
-        todo!()
-    }
-
-    fn move_type(&self) -> MoveType {
-        todo!()
-    }
-}
-
-impl ChessMove for EnPassantMove {
-    fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
-        todo!()
-    }
-
-    fn from(&self) -> Square {
-        todo!()
-    }
-
-    fn to(&self) -> Square {
-        todo!()
-    }
-
-    fn move_type(&self) -> MoveType {
-        todo!()
-    }
-}
-
-impl ChessMove for PromotionMove {
-    fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
-        todo!()
-    }
-
-    fn from(&self) -> Square {
-        todo!()
-    }
-
-    fn to(&self) -> Square {
-        todo!()
-    }
-
-    fn move_type(&self) -> MoveType {
-        todo!()
-    }
-}
-
-impl ChessMove for PromotionCapture {
-    fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
-        todo!()
-    }
-
-    fn from(&self) -> Square {
-        todo!()
-    }
-
-    fn to(&self) -> Square {
-        todo!()
-    }
-
-    fn move_type(&self) -> MoveType {
-        todo!()
-    }
-}
-
-impl ChessMove for CastleMove {
-    fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
-        todo!()
-    }
-
-    fn from(&self) -> Square {
-        todo!()
-    }
-
-    fn to(&self) -> Square {
-        todo!()
-    }
-
-    fn move_type(&self) -> MoveType {
-        todo!()
-    }
 }
 
 impl Display for Move {

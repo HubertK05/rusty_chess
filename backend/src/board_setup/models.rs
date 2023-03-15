@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Display};
 
-use crate::{move_generator::{models::{Color, Square}, ChessPiece}, move_register::models::CastleType};
+use crate::{move_generator::{models::{Color, Square, PieceType}, ChessPiece}, move_register::{models::{CastleType, MoveError, MoveType}, ChessMove}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FenPieceType {
@@ -98,6 +98,96 @@ impl Board {
     pub fn get_square(&self, sq: Square) -> Option<&dyn ChessPiece> {
         let Square(file_number, rank_number) = sq;
         self.board.get(rank_number as usize)?.get(file_number as usize)?.as_deref()
+    }
+
+    pub fn set_ep_target_square(&mut self, sq: Option<Square>) {
+        self.en_passant_square = sq
+    }
+
+    pub fn set_king_position(&mut self, sq: Square, color: Color) {
+        match color {
+            Color::White => self.king_positions.0 = sq,
+            Color::Black => self.king_positions.1 = sq,
+        }
+    }
+
+    pub fn change_mating_material(&mut self, color: Color, points: i8) {
+        if points.is_negative() {
+            match color {
+                Color::White => self.mating_material.0 -= -points as u8,
+                Color::Black => self.mating_material.1 -= -points as u8,
+            }    
+        } else {
+            match color {
+                Color::White => self.mating_material.0 += points as u8,
+                Color::Black => self.mating_material.1 += points as u8,
+            }
+        }
+    }
+
+    pub fn take_piece(&mut self, sq: Square) -> Result<Box<dyn ChessPiece>, MoveError> {
+        if !sq.is_in_bounds() {
+            return Err(MoveError::OutOfBounds);
+        }
+        self.board[sq.1 as usize][sq.0 as usize].take().ok_or(MoveError::PieceNotFound)
+    }
+
+    pub fn place_piece(&mut self, mut p: Box<dyn ChessPiece>, sq: Square) -> Result<(), MoveError> {
+        if !sq.is_in_bounds() {
+            return Err(MoveError::OutOfBounds);
+        }
+        p.set_position(sq);
+        Ok(self.board[sq.1 as usize][sq.0 as usize] = Some(p))
+    }
+
+    pub fn set_castling(&mut self, m: &dyn ChessMove) {
+        if m.from() == Square(0, 0) || m.from() == Square(4, 0) {
+            self.castling.white_long = false;
+        }
+        if m.from() == Square(7, 0) || m.from() == Square(4, 0) {
+            self.castling.white_short = false;
+        }
+        if m.to() == Square(0, 7) || m.to() == Square(4, 7) {
+            self.castling.black_long = false;
+        }
+        if m.to() == Square(7, 7) || m.to() == Square(4, 7) {
+            self.castling.black_short = false;
+        }
+    }
+
+    pub fn increment_half_move_timer(&mut self) {
+        self.half_move_timer_50 += 1;
+    }
+
+    pub fn reset_half_move_timer(&mut self) {
+        self.half_move_timer_50 = 0;
+    }
+
+    pub fn increment_full_move_timer(&mut self) {
+        self.full_move_number += 1;
+    }
+
+    pub fn advance_turn(&mut self) {
+        self.turn = self.turn.opp();
+    }
+
+    pub fn register_move(&mut self, m: &dyn ChessMove) -> Result<(), MoveError> {
+        self.increment_half_move_timer();
+        match m.move_type() {
+            MoveType::Capture | MoveType::EnPassantMove | MoveType::PromotionMove | MoveType::PromotionCapture => self.reset_half_move_timer(),
+            _ => (),
+        };
+
+        self.set_ep_target_square(None);
+
+        m.register_move(self)?;
+        
+        self.advance_turn();
+        if self.turn == Color::White {
+            self.increment_full_move_timer();
+        }
+
+        Ok(())
     }
 }
 
