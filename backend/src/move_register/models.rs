@@ -1,8 +1,5 @@
-use std::fmt::{Display, self};
-
-use dyn_clone::DynClone;
-
-use crate::{move_generator::models::{PieceType, Color, Square}, board_setup::models::Board};
+use crate::move_generator::models::{Color, PieceType, Square};
+use std::fmt::{self, Display};
 
 #[derive(Debug, PartialEq)]
 pub enum MoveError {
@@ -19,11 +16,7 @@ pub struct Move {
 
 impl Move {
     pub fn new(piece: PieceType, from: Square, to: Square) -> Self {
-        Self {
-            piece,
-            from,
-            to,
-        }
+        Self { piece, from, to }
     }
 }
 
@@ -36,11 +29,7 @@ pub struct Capture {
 
 impl Capture {
     pub fn new(piece: PieceType, from: Square, to: Square) -> Self {
-        Self {
-            piece,
-            from,
-            to,
-        }
+        Self { piece, from, to }
     }
 }
 
@@ -51,9 +40,7 @@ pub struct CastleMove {
 
 impl CastleMove {
     pub fn new(castle_type: CastleType) -> Self {
-        Self {
-            castle_type,
-        }
+        Self { castle_type }
     }
 }
 
@@ -79,10 +66,7 @@ pub struct EnPassantMove {
 
 impl EnPassantMove {
     pub fn new(from: Square, to: Square) -> Self {
-        Self {
-            from,
-            to,
-        }
+        Self { from, to }
     }
 }
 
@@ -149,7 +133,10 @@ impl Display for Move {
         let from_rank_number = self.from.1 + 1;
         let to_file_letter = (self.to.0 as u8 + 97) as char;
         let to_rank_number = self.to.1 + 1;
-        write!(f, "{piece_letter}{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}")
+        write!(
+            f,
+            "{piece_letter}{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}"
+        )
     }
 }
 
@@ -160,7 +147,10 @@ impl Display for Capture {
         let from_rank_number = self.from.1 + 1;
         let to_file_letter = (self.to.0 as u8 + 97) as char;
         let to_rank_number = self.to.1 + 1;
-        write!(f, "{piece_letter}x{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}")
+        write!(
+            f,
+            "{piece_letter}x{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}"
+        )
     }
 }
 
@@ -197,7 +187,10 @@ impl Display for PromotionCapture {
         let to_file_letter = (self.to.0 as u8 + 97) as char;
         let to_rank_number = self.to.1 + 1;
         let piece_letter = &self.to_piece;
-        write!(f, "{from_file_letter}x{to_file_letter}{to_rank_number}={piece_letter}")
+        write!(
+            f,
+            "{from_file_letter}x{to_file_letter}{to_rank_number}={piece_letter}"
+        )
     }
 }
 

@@ -1,10 +1,14 @@
-use std::{fmt::{Display, self}, collections::{HashSet, HashMap}, ops::{Mul, Add, Sub}};
+use crate::{
+    board_setup::models::{Board, BoardError},
+    move_register::ChessMove,
+};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, Display},
+    ops::{Add, Mul, Sub},
+};
 
-use dyn_clone::DynClone;
-
-use crate::{board_setup::models::{BoardError, Board, FenPieceType}, move_register::{ChessMove, models::MoveError}};
-
-use super::restrictions::{get_checked, get_pins, get_attacked};
+use super::restrictions::{get_attacked, get_checked, get_pins};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PieceType {
@@ -137,16 +141,19 @@ impl TryFrom<&str> for Square {
     type Error = BoardError;
 
     fn try_from(val: &str) -> Result<Self, Self::Error> {
-        if val.len() != 2 { return Err(BoardError::ConversionFailure) }
+        if val.len() != 2 {
+            return Err(BoardError::ConversionFailure);
+        }
         let mut val = val.chars();
 
         let file_number = ((val.next().ok_or(BoardError::ConversionFailure)? as u8) - 97) as i8;
         let rank_number = val
-                                .next()
-                                .ok_or(BoardError::ConversionFailure)?
-                                .to_string()
-                                .parse::<i8>()
-                                .map_err(|_e| BoardError::ConversionFailure)? - 1;
+            .next()
+            .ok_or(BoardError::ConversionFailure)?
+            .to_string()
+            .parse::<i8>()
+            .map_err(|_e| BoardError::ConversionFailure)?
+            - 1;
 
         Ok(Square(file_number, rank_number))
     }
@@ -221,6 +228,22 @@ impl Moves {
     pub fn add_move(&mut self, m: Box<dyn ChessMove>) {
         self.0.push(m);
     }
+
+    pub fn get_all_moves(board: &Board, color: Color) -> Self {
+        let restrictions = MoveRestrictionData::get(board, color);
+        let mut res: Vec<Box<dyn ChessMove>> = Vec::new();
+        for rank in 0..=7 {
+            for file in 0..=7 {
+                if let Some(p) = board.get_square(Square(file, rank)) {
+                    if p.color() == color {
+                        res.extend(p.get_moves(board, &restrictions));
+                    }
+                }
+            }
+        }
+
+        Moves(res)
+    }
 }
 
 impl Display for Moves {
@@ -232,6 +255,7 @@ impl Display for Moves {
     }
 }
 
+#[derive(Debug)]
 pub struct Attacked(pub HashSet<Square>);
 
 impl Display for Attacked {
@@ -243,12 +267,11 @@ impl Display for Attacked {
     }
 }
 
+#[derive(Debug)]
 pub struct CheckSquares {
     pub squares: HashSet<Square>,
     pub checks_amount: u8,
 }
-
-pub struct EnPassantCheckSquare(Option<Square>);
 
 impl Display for CheckSquares {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -259,6 +282,7 @@ impl Display for CheckSquares {
     }
 }
 
+#[derive(Debug)]
 pub struct PinSquares(pub HashMap<Square, PinDir>);
 
 impl Display for PinSquares {
@@ -290,6 +314,7 @@ impl From<MoveDir> for PinDir {
     }
 }
 
+#[derive(Debug)]
 pub struct MoveRestrictionData {
     pub attacked: Attacked,
     pub check_squares: CheckSquares,

@@ -1,8 +1,17 @@
-﻿use dyn_clone::DynClone;
+use dyn_clone::DynClone;
 
-use crate::{board_setup::models::Board, move_generator::{models::{Square, PieceType, Offset, Color, Queen, Knight, Bishop, Rook}, ChessPiece}};
+use crate::{
+    board_setup::models::Board,
+    move_generator::{
+        models::{Bishop, Color, Knight, Offset, PieceType, Queen, Rook, Square},
+        ChessPiece,
+    },
+};
 
-use self::models::{MoveError, MoveType, Move, Capture, EnPassantMove, PromotionMove, PromotionCapture, CastleType, CastleMove, PromotedPieceType};
+use self::models::{
+    Capture, CastleMove, CastleType, EnPassantMove, Move, MoveError, MoveType, PromotedPieceType,
+    PromotionCapture, PromotionMove,
+};
 
 pub mod models;
 
@@ -21,8 +30,6 @@ impl ChessMove for Move {
         if p.piece_type() == PieceType::King {
             board.set_king_position(self.to, p.color())
         }
-
-        board.set_castling(self);
 
         if p.piece_type() == PieceType::Pawn {
             if (self.to - self.from).1.abs() == 2 {
@@ -57,8 +64,6 @@ impl ChessMove for Capture {
         if p.piece_type() == PieceType::King {
             board.set_king_position(self.to, p.color())
         }
-
-        board.set_castling(self);
 
         board.change_mating_material(cap_p.color(), -(cap_p.mating_material_points() as i8));
         board.place_piece(p, self.to)?;
@@ -161,8 +166,6 @@ impl ChessMove for PromotionCapture {
 
 impl ChessMove for CastleMove {
     fn register_move(&self, board: &mut Board) -> Result<(), MoveError> {
-        board.set_castling(self);
-
         let (king_pos, rook_pos, target_king_pos, target_rook_pos) = match self.castle_type {
             CastleType::WhiteShort => (Square(4, 0), Square(7, 0), Square(6, 0), Square(5, 0)),
             CastleType::WhiteLong => (Square(4, 0), Square(0, 0), Square(2, 0), Square(3, 0)),
@@ -171,6 +174,7 @@ impl ChessMove for CastleMove {
         };
 
         let k = board.take_piece(king_pos)?;
+        board.set_king_position(target_king_pos, k.color());
         let r = board.take_piece(rook_pos)?;
         board.place_piece(k, target_king_pos)?;
         board.place_piece(r, target_rook_pos)?;
@@ -199,7 +203,11 @@ impl ChessMove for CastleMove {
     }
 }
 
-fn promote_piece(piece_type: PromotedPieceType, position: Square, color: Color) -> Box<dyn ChessPiece> {
+fn promote_piece(
+    piece_type: PromotedPieceType,
+    position: Square,
+    color: Color,
+) -> Box<dyn ChessPiece> {
     match piece_type {
         PromotedPieceType::Queen => Box::new(Queen { color, position }),
         PromotedPieceType::Knight => Box::new(Knight { color, position }),

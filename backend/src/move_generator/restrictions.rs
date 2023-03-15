@@ -1,17 +1,39 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
-use crate::{board_setup::models::Board, move_register::ChessMove};
+use crate::{
+    board_setup::models::Board,
+    move_register::{models::MoveType, ChessMove},
+};
 
-use super::{models::{Square, Color, MoveDir, CheckedAdd, Offset, PieceType, CheckSquares, PinSquares, PinDir, Attacked, Moves}, MAX_MOVES_IN_A_SERIES, ChessPiece, KNIGHT_MOVES, QUEEN_MOVES};
+use super::{
+    models::{
+        Attacked, CheckSquares, CheckedAdd, Color, MoveDir, Offset, PieceType, PinDir, PinSquares,
+        Square,
+    },
+    KNIGHT_MOVES, MAX_MOVES_IN_A_SERIES, QUEEN_MOVES,
+};
 
-const POTENTIALLY_ATTACKED_SQUARES: [Offset; 13] = [Offset(0, 1), Offset(0, -1), Offset(-1, 0), Offset(1, 0), Offset(-1, 1), Offset(-1, -1), Offset(1, 1), Offset(1, -1), Offset(1, 0), Offset(2, 0), Offset(-1, 0), Offset(-2, 0), Offset(-3, 0)];
+const POTENTIALLY_ATTACKED_SQUARES: [Offset; 12] = [
+    Offset(0, 1),
+    Offset(0, -1),
+    Offset(-1, 0),
+    Offset(1, 0),
+    Offset(-1, 1),
+    Offset(-1, -1),
+    Offset(1, 1),
+    Offset(1, -1),
+    Offset(1, 0),
+    Offset(2, 0),
+    Offset(-1, 0),
+    Offset(-2, 0),
+];
 
 pub fn get_attacked(board: &Board, color: Color) -> Attacked {
     let sq = match color {
         Color::White => board.king_positions.0,
         Color::Black => board.king_positions.1,
     };
-    
+
     let mut res = HashSet::new();
     for dir in POTENTIALLY_ATTACKED_SQUARES {
         let Some(target_sq) = sq.c_add(Offset::from(dir)) else {
@@ -39,13 +61,13 @@ pub fn is_attacked(board: &Board, sq: Square, color: Color) -> bool {
             };
 
             if p.piece_type() == PieceType::King && p.color() == color {
-                continue
+                continue;
             };
 
             if attack_condition(offset, color, p.piece_type()) && p.color() != color {
-                return true
+                return true;
             } else {
-                break
+                break;
             };
         }
     }
@@ -60,11 +82,11 @@ pub fn is_attacked(board: &Board, sq: Square, color: Color) -> bool {
         };
 
         if attack_condition(offset, color, p.piece_type()) && p.color() != color {
-            return true
+            return true;
         };
     }
 
-    return false
+    return false;
 }
 
 pub fn get_checked(board: &Board, color: Color) -> CheckSquares {
@@ -95,8 +117,8 @@ pub fn get_checked(board: &Board, color: Color) -> CheckSquares {
             if attack_condition(offset, color, p.piece_type()) && p.color() != color {
                 res.squares.extend(squares);
                 res.checks_amount += 1;
-                break
             };
+            break;
         }
     }
 
@@ -112,7 +134,7 @@ pub fn get_checked(board: &Board, color: Color) -> CheckSquares {
         if attack_condition(offset, color, p.piece_type()) && p.color() != color {
             res.squares.insert(target_sq);
             res.checks_amount += 1;
-            continue
+            continue;
         };
     }
 
@@ -145,9 +167,9 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
                 if let Some(s) = pin_sq {
                     res.insert(s, PinDir::from(dir));
                 }
-                break
+                break;
             } else {
-                break
+                break;
             };
         }
     }
@@ -173,24 +195,24 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
                 let Some(target_sq) = sq.c_add(offset) else {
                     break
                 };
-    
+
                 if target_sq == en_passant_sq {
-                    continue
+                    continue;
                 }
 
                 let Some(p) = board.get_square(target_sq) else {
                     continue
                 };
-    
+
                 if p.color() == color && p.piece_type() == PieceType::Pawn && pin_sq.is_none() {
                     pin_sq = Some(target_sq);
                 } else if attack_condition(offset, color, p.piece_type()) && p.color() != color {
                     if let Some(s) = pin_sq {
                         res.insert(s, PinDir::EnPassantBlock);
                     }
-                    break
+                    break;
                 } else {
-                    break
+                    break;
                 };
             }
         }
@@ -201,37 +223,58 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
 
 fn attack_condition(offset: Offset, color: Color, piece: PieceType) -> bool {
     match piece {
-        PieceType::Pawn => {
-            match color {
-                Color::White => offset == Offset(-1, 1) || offset == Offset(1, 1),
-                Color::Black => offset == Offset(-1, -1) || offset == Offset(1, -1),
-            }
+        PieceType::Pawn => match color {
+            Color::White => offset == Offset(-1, 1) || offset == Offset(1, 1),
+            Color::Black => offset == Offset(-1, -1) || offset == Offset(1, -1),
         },
-        PieceType::Knight => (offset.0.abs() == 2 && offset.1.abs() == 1) || (offset.0.abs() == 1 && offset.1.abs() == 2),
+        PieceType::Knight => {
+            (offset.0.abs() == 2 && offset.1.abs() == 1)
+                || (offset.0.abs() == 1 && offset.1.abs() == 2)
+        }
         PieceType::Bishop => offset.0.abs() == offset.1.abs(),
         PieceType::Rook => offset.0.abs() == 0 || offset.1.abs() == 0,
-        PieceType::Queen => offset.0.abs() == 0 || offset.1.abs() == 0 || offset.0.abs() == offset.1.abs(),
-        PieceType::King => offset.0.abs() <= 1 || offset.1.abs() <= 1,
+        PieceType::Queen => {
+            offset.0.abs() == 0 || offset.1.abs() == 0 || offset.0.abs() == offset.1.abs()
+        }
+        PieceType::King => offset.0.abs() <= 1 && offset.1.abs() <= 1,
     }
 }
 
-pub fn filter_with_checked(moves: Vec<Box<dyn ChessMove>>, checked: &CheckSquares) -> Vec<Box<dyn ChessMove>> {
+pub fn filter_with_checked(
+    moves: Vec<Box<dyn ChessMove>>,
+    checked: &CheckSquares,
+) -> Vec<Box<dyn ChessMove>> {
     match checked.checks_amount {
         0 => moves,
-        1 => moves.into_iter().filter(|x| checked.squares.contains(&x.to())).collect(),
+        1 => moves
+            .into_iter()
+            .filter(|x| {
+                if x.move_type() != MoveType::EnPassantMove {
+                    checked.squares.contains(&x.to())
+                } else {
+                    checked.squares.len() == 1
+                }
+            })
+            .collect(),
         2 => Vec::new(),
         _ => unreachable!(),
     }
 }
 
-pub fn filter_with_pins(moves: Vec<Box<dyn ChessMove>>, pins: &PinSquares) -> Vec<Box<dyn ChessMove>> {
-    moves.into_iter().filter(|x| {
-        if let Some(dir) = pins.0.get(&x.from()) {
-            pin_condition(x.to() - x.from(), *dir)
-        } else {
-            true
-        }
-    }).collect()
+pub fn filter_with_pins(
+    moves: Vec<Box<dyn ChessMove>>,
+    pins: &PinSquares,
+) -> Vec<Box<dyn ChessMove>> {
+    moves
+        .into_iter()
+        .filter(|x| {
+            if let Some(dir) = pins.0.get(&x.from()) {
+                pin_condition(x.to() - x.from(), *dir)
+            } else {
+                true
+            }
+        })
+        .collect()
 }
 
 fn pin_condition(offset: Offset, pin_dir: PinDir) -> bool {
