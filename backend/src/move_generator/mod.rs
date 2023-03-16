@@ -15,8 +15,8 @@ use crate::{
 
 use self::{
     models::{
-        Attacked, Bishop, CheckedAdd, Color, King, Knight, MoveDir,
-        MoveRestrictionData, Offset, Pawn, PieceType, PinDir, Queen, Rook, Square,
+        Attacked, Bishop, CheckedAdd, Color, King, Knight, MoveDir, MoveRestrictionData, Offset,
+        Pawn, PieceType, PinDir, Queen, Rook, Square,
     },
     restrictions::{filter_with_checked, filter_with_pins},
 };

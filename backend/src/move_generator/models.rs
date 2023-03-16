@@ -20,6 +20,19 @@ pub enum PieceType {
     King,
 }
 
+impl From<PieceType> for char {
+    fn from(val: PieceType) -> Self {
+        match val {
+            PieceType::Pawn => ' ',
+            PieceType::Knight => 'N',
+            PieceType::Bishop => 'B',
+            PieceType::Rook => 'R',
+            PieceType::Queen => 'Q',
+            PieceType::King => 'K',
+        }
+    }
+}
+
 impl Display for PieceType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let _ = match self {

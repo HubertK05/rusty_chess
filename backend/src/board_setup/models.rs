@@ -69,58 +69,40 @@ impl TryFrom<&str> for FenPieceType {
     }
 }
 
-impl TryFrom<char> for Box<dyn ChessPiece> {
+impl TryFrom<(char, Square)> for Box<dyn ChessPiece> {
     type Error = BoardError;
 
-    fn try_from(val: char) -> Result<Self, Self::Error> {
-        match val {
-            'P' => Ok(Box::new(Pawn {
-                position: Square(0, 0),
-                color: Color::White,
-            })),
-            'N' => Ok(Box::new(Knight {
-                position: Square(0, 0),
-                color: Color::White,
-            })),
-            'K' => Ok(Box::new(King {
-                position: Square(0, 0),
-                color: Color::White,
-            })),
-            'R' => Ok(Box::new(Rook {
-                position: Square(0, 0),
-                color: Color::White,
-            })),
-            'B' => Ok(Box::new(Bishop {
-                position: Square(0, 0),
-                color: Color::White,
-            })),
-            'Q' => Ok(Box::new(Queen {
-                position: Square(0, 0),
-                color: Color::White,
-            })),
+    fn try_from(val: (char, Square)) -> Result<Self, Self::Error> {
+        let color = if val.0.is_lowercase() {
+            Color::Black
+        } else {
+            Color::White
+        };
+
+        match val.0.to_ascii_lowercase() {
             'p' => Ok(Box::new(Pawn {
-                position: Square(0, 0),
-                color: Color::Black,
+                position: val.1,
+                color,
             })),
             'n' => Ok(Box::new(Knight {
-                position: Square(0, 0),
-                color: Color::Black,
+                position: val.1,
+                color,
             })),
             'k' => Ok(Box::new(King {
-                position: Square(0, 0),
-                color: Color::Black,
+                position: val.1,
+                color,
             })),
             'r' => Ok(Box::new(Rook {
-                position: Square(0, 0),
-                color: Color::Black,
+                position: val.1,
+                color,
             })),
             'b' => Ok(Box::new(Bishop {
-                position: Square(0, 0),
-                color: Color::Black,
+                position: val.1,
+                color,
             })),
             'q' => Ok(Box::new(Queen {
-                position: Square(0, 0),
-                color: Color::Black,
+                position: val.1,
+                color,
             })),
             _ => Err(BoardError::ConversionFailure),
         }
@@ -279,50 +261,70 @@ impl FenNotation {
     }
 }
 
-// impl From<&Board> for FenNotation {
-//     fn from(val: &Board) -> Self {
-//         let mut res = String::new();
-//         for file in (0..8).rev() {
-//             let mut empty_counter = 0;
-//             for rank in 0..8 {
-//                 let piece = val.get_square(Vec2(rank, file));
-//                 if let Some(p) = piece {
-//                     if empty_counter != 0 {
-//                         res.push_str(&empty_counter.to_string());
-//                         empty_counter = 0;
-//                     }
-//                     res.push_str(&p.fen_piece_type().to_string());
-//                 } else { empty_counter += 1 }
-//             }
-//             if empty_counter != 0 { res.push_str(&empty_counter.to_string()) }
-//             if file != 0 { res.push('/') }
-//         }
+impl From<&Board> for FenNotation {
+    fn from(val: &Board) -> Self {
+        let mut res = String::new();
+        for file in (0..8).rev() {
+            let mut empty_counter = 0;
+            for rank in 0..8 {
+                let piece = val.get_square(Square(rank, file));
+                if let Some(p) = piece {
+                    if empty_counter != 0 {
+                        res.push_str(&empty_counter.to_string());
+                        empty_counter = 0;
+                    }
+                    res.push_str(&p.fen_piece_type().to_string());
+                } else {
+                    empty_counter += 1
+                }
+            }
+            if empty_counter != 0 {
+                res.push_str(&empty_counter.to_string())
+            }
+            if file != 0 {
+                res.push('/')
+            }
+        }
 
-//         match val.turn {
-//             Color::White => res.push_str(" w "),
-//             Color::Black => res.push_str(" b "),
-//         }
+        match val.turn {
+            Color::White => res.push_str(" w "),
+            Color::Black => res.push_str(" b "),
+        }
 
-//         let mut castling_rights = String::new();
-//         if val.castling.contains(&CastleType::WhiteShort) { castling_rights.push('K') }
-//         if val.castling.contains(&CastleType::WhiteLong) { castling_rights.push('Q') }
-//         if val.castling.contains(&CastleType::BlackShort) { castling_rights.push('k') }
-//         if val.castling.contains(&CastleType::BlackLong) { castling_rights.push('q') }
+        let mut castling_rights = String::new();
+        if val.castling.white_short {
+            castling_rights.push('K')
+        }
+        if val.castling.white_long {
+            castling_rights.push('Q')
+        }
+        if val.castling.black_short {
+            castling_rights.push('k')
+        }
+        if val.castling.black_long {
+            castling_rights.push('q')
+        }
 
-//         if castling_rights.is_empty() {
-//             res.push('-');
-//         } else {
-//             res.push_str(&castling_rights);
-//         }
+        if castling_rights.is_empty() {
+            res.push('-');
+        } else {
+            res.push_str(&castling_rights);
+        }
 
-//         res.push_str(" - ");
-//         res.push_str(&val.half_move_timer_50.to_string());
-//         res.push(' ');
-//         res.push_str(&val.full_move_number.to_string());
+        res.push(' ');
+        if let Some(sq) = &val.en_passant_square {
+            res.push_str(&sq.to_string());
+        } else {
+            res.push('-');
+        }
+        res.push(' ');
+        res.push_str(&val.half_move_timer_50.to_string());
+        res.push(' ');
+        res.push_str(&val.full_move_number.to_string());
 
-//         FenNotation(res)
-//     }
-// }
+        FenNotation(res)
+    }
+}
 
 impl TryFrom<FenNotation> for Board {
     type Error = BoardError;
@@ -353,18 +355,17 @@ impl TryFrom<FenNotation> for Board {
                     file = 0;
                 }
                 _ => {
-                    let mut piece: Box<dyn ChessPiece> = char
+                    let pos = Square(file as i8, rank as i8);
+                    let mut piece: Box<dyn ChessPiece> = (char, pos)
                         .try_into()
                         .map_err(|_e| BoardError::ConversionFailure)?;
                     if piece.piece_type() == PieceType::King {
                         match piece.color() {
-                            Color::White => white_king_pos = Square(file as i8, rank as i8),
-                            Color::Black => black_king_pos = Square(file as i8, rank as i8),
+                            Color::White => white_king_pos = pos,
+                            Color::Black => black_king_pos = pos,
                         }
                     }
-                    piece
-                        .deref_mut()
-                        .set_position(Square(file as i8, rank as i8));
+                    piece.deref_mut().set_position(pos);
                     match piece.color() {
                         Color::White => mating_material.0 += piece.mating_material_points(),
                         Color::Black => mating_material.1 += piece.mating_material_points(),

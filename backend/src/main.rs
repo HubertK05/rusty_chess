@@ -1,42 +1,30 @@
-use std::io;
+use std::{io, collections::HashMap};
 
 use backend::{
     board_setup::models::{Board, FenNotation},
-    move_generator::models::Moves,
+    move_generator::{models::Moves, restrictions::get_checked},
 };
 
 fn main() {
-    let mut board = Board::try_from(FenNotation(
-        "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1".into(),
-    ))
-    .unwrap();
-    // let mut board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
-    // println!("{}, {:?}", &board, &board);
-
-    // let mut repetition_map: HashMap<String, u8> = HashMap::new();
-    // repetition_map.insert("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq".into(), 1);
+    let mut board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
+    let mut repetition_map: HashMap<String, u8> = HashMap::new();
+    repetition_map.insert("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq".into(), 1);
     loop {
         println!("{board}");
-        println!("{:?}", &board);
+        println!("{:?}", FenNotation::try_from(&board).expect("wrong board"));
         let color = board.turn;
-
-        // let opponent_color = color.opp();
 
         let mut moves = Moves::get_all_moves(&board, color);
 
-        // if moves.0.is_empty() {
-        //     match CheckSquares::get_all_checked_squares(&board, opponent_color).1 {
-        //         0 => println!("No moves left - draw by stalemate."),
-        //         _ => println!("{} wins by checkmate.", opponent_color.to_string())
-        //     }
-        //     break
-        // }
+        if moves.0.is_empty() {
+            match get_checked(&board, color).checks_amount {
+                0 => println!("No moves left - draw by stalemate."),
+                _ => println!("{} wins by checkmate.", color.opp().to_string())
+            }
+            break
+        }
 
         println!("Available moves: {} ({})", moves, moves.0.len());
-        // println!("Black moves: {}", Moves::get_all_moves(&board, Color::Black));
-        // println!("White attacks these squares: {}", Attacked::get_attacked_squares(&board, Color::White));
-        // println!("Opponent can block your check on these squares: {}", CheckSquares::get_all_checked_squares(&board, color));
-
         println!("Please input your move choice.");
 
         let mut choice = String::new();
@@ -67,21 +55,17 @@ fn main() {
             break;
         }
 
-        // let fen = FenNotation::from(&board);
-        // let rep_number = *repetition_map.entry(fen.to_draw_fen())
-        //     .and_modify(|position_num| {
-        //         *position_num += 1;
-        //     })
-        //     .or_insert(1);
+        let fen = FenNotation::from(&board);
+        let rep_number = *repetition_map.entry(fen.to_draw_fen())
+            .and_modify(|position_num| {
+                *position_num += 1;
+            })
+            .or_insert(1);
 
-        // if rep_number >= 3 {
-        //     println!("{board}");
-        //     println!("Draw by threefold repetition.");
-        //     break
-        // }
-
-        // println!("debug: move timer: {}, white mating material: {}, black_mating_material: {}", &board.half_move_timer_50, &board.white_mating_material, &board.black_mating_material);
-        // println!("debug: fen notation: {:?}", &fen);
-        // println!("debug: castling rights: {:?}", &board.castling);
+        if rep_number >= 3 {
+            println!("{board}");
+            println!("Draw by threefold repetition.");
+            break
+        }
     }
 }

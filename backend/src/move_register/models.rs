@@ -129,27 +129,28 @@ pub enum MoveType {
 impl Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let piece_letter = self.piece;
-        let from_file_letter = (self.from.0 as u8 + 97) as char;
-        let from_rank_number = self.from.1 + 1;
         let to_file_letter = (self.to.0 as u8 + 97) as char;
         let to_rank_number = self.to.1 + 1;
         write!(
             f,
-            "{piece_letter}{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}"
+            "{piece_letter}{to_file_letter}{to_rank_number}"
         )
     }
 }
 
 impl Display for Capture {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let piece_letter = self.piece;
-        let from_file_letter = (self.from.0 as u8 + 97) as char;
-        let from_rank_number = self.from.1 + 1;
+        let piece_type = self.piece;
+        let piece_letter = if piece_type == PieceType::Pawn {
+            (self.from.0 as u8 + 97) as char
+        } else {
+            char::from(self.piece)
+        };
         let to_file_letter = (self.to.0 as u8 + 97) as char;
         let to_rank_number = self.to.1 + 1;
         write!(
             f,
-            "{piece_letter}x{from_file_letter}{from_rank_number}-{to_file_letter}{to_rank_number}"
+            "{piece_letter}x{to_file_letter}{to_rank_number}"
         )
     }
 }
