@@ -1,1 +1,3 @@
 ﻿/backend/target
+/gui/target
+/gui/Cargo.lock
