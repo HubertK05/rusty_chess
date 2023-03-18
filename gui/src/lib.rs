@@ -1,9 +1,10 @@
 pub mod models;
-use std::fmt::Display;
-use crate::models::{ChessPiece, PieceType, Color};
+use crate::models::ChessPiece;
 
-use eframe::{CreationContext, epaint};
-use egui::{Context, Ui, Rect, Vec2, Shape, Sense, InnerResponse, Color32, Stroke, Id, CursorIcon, LayerId, Order, Label};
+use eframe::{epaint, CreationContext};
+use egui::{
+    Color32, CursorIcon, Id, InnerResponse, Label, LayerId, Order, Rect, Sense, Shape, Ui, Vec2,
+};
 
 fn board_piece(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui)) {
     let is_dragged = ui.memory(|mem| mem.is_being_dragged(id));
@@ -62,7 +63,7 @@ pub struct ChessGui {
 }
 
 impl ChessGui {
-    pub fn new_game(cc: &CreationContext) -> Self {
+    pub fn new_game(_cc: &CreationContext) -> Self {
         Self::from([
             ["r", "n", "b", "q", "k", "b", "n", "r"],
             ["p", "p", "p", "p", "p", "p", "p", "p"],
@@ -79,35 +80,46 @@ impl ChessGui {
         let id_source = Id::new("piece id");
         let mut source_sq: Option<(usize, usize)> = None;
         let mut drop_sq: Option<(usize, usize)> = None;
-        let response = egui::Grid::new("some id").show(ui, |ui| {
-            for (rank_idx, rank) in self.board.clone().into_iter().enumerate().rev() {
-                ui.columns(8, |uis| {
-                    for (file, sq) in rank.clone().into_iter().enumerate() {
-                        let ui = &mut uis[file];
-                        ui.horizontal(|ui| {
-                            let response = board_square(ui, rank_idx + file, |ui| {
-                                ui.set_min_size(Vec2::new(60., 60.));
-                                ui.set_max_size(Vec2::new(60., 60.));
-                                ui.centered_and_justified(|ui| {
-                                    let piece_id = id_source.with(rank_idx).with(file);
-                                    let response_opt = match sq {
-                                        Some(p) => board_piece(ui, piece_id, |ui| { ui.add(Label::new(p.to_string()).sense(Sense::click())); }),
-                                        None => { ui.scope(|ui| ui.label("".to_string())); },
-                                    };
-                                    if ui.memory(|mem| mem.is_being_dragged(piece_id)) {
-                                        source_sq = Some((file, rank_idx));
-                                    }
-                                });
-                            }).response;
-                            if ui.memory(|mem| mem.is_anything_being_dragged()) && response.hovered() {
-                                drop_sq = Some((file, rank_idx));
-                            }
-                        });
-                    }
-                });
-                ui.end_row();
-            }
-        }).response;
+        egui::Grid::new("some id")
+            .show(ui, |ui| {
+                for (rank_idx, rank) in self.board.clone().into_iter().enumerate().rev() {
+                    ui.columns(8, |uis| {
+                        for (file, sq) in rank.clone().into_iter().enumerate() {
+                            let ui = &mut uis[file];
+                            ui.horizontal(|ui| {
+                                let response = board_square(ui, rank_idx + file, |ui| {
+                                    ui.set_min_size(Vec2::new(60., 60.));
+                                    ui.set_max_size(Vec2::new(60., 60.));
+                                    ui.centered_and_justified(|ui| {
+                                        let piece_id = id_source.with(rank_idx).with(file);
+                                        match sq {
+                                            Some(p) => board_piece(ui, piece_id, |ui| {
+                                                ui.add(
+                                                    Label::new(p.to_string()).sense(Sense::click()),
+                                                );
+                                            }),
+                                            None => {
+                                                ui.scope(|ui| ui.label("".to_string()));
+                                            }
+                                        };
+                                        if ui.memory(|mem| mem.is_being_dragged(piece_id)) {
+                                            source_sq = Some((file, rank_idx));
+                                        }
+                                    });
+                                })
+                                .response;
+                                if ui.memory(|mem| mem.is_anything_being_dragged())
+                                    && response.hovered()
+                                {
+                                    drop_sq = Some((file, rank_idx));
+                                }
+                            });
+                        }
+                    });
+                    ui.end_row();
+                }
+            })
+            .response;
 
         if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
             if ui.input(|i| i.pointer.any_released()) {
@@ -120,40 +132,10 @@ impl ChessGui {
 }
 
 impl eframe::App for ChessGui {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.spacing_mut().item_spacing = Vec2::new(3., 3.);
             self.ui(ui);
         });
     }
-}
-
-impl From<[[&str; 8]; 8]> for ChessGui {
-    fn from(val: [[&str; 8]; 8]) -> Self {
-        let mut res = ChessGui::default();
-        for rank in (0..8).rev() {
-            for file in 0..8 {
-                res.board[rank][file] = match val[7 - rank][file] {
-                    "P" => Some(ChessPiece { piece_type: PieceType::Pawn, color: Color::White }),
-                    "N" => Some(ChessPiece { piece_type: PieceType::Knight, color: Color::White }),
-                    "B" => Some(ChessPiece { piece_type: PieceType::Bishop, color: Color::White }),
-                    "R" => Some(ChessPiece { piece_type: PieceType::Rook, color: Color::White }),
-                    "Q" => Some(ChessPiece { piece_type: PieceType::Queen, color: Color::White }),
-                    "K" => Some(ChessPiece { piece_type: PieceType::King, color: Color::White }),
-                    "p" => Some(ChessPiece { piece_type: PieceType::Pawn, color: Color::Black }),
-                    "n" => Some(ChessPiece { piece_type: PieceType::Knight, color: Color::Black }),
-                    "b" => Some(ChessPiece { piece_type: PieceType::Bishop, color: Color::Black }),
-                    "r" => Some(ChessPiece { piece_type: PieceType::Rook, color: Color::Black }),
-                    "q" => Some(ChessPiece { piece_type: PieceType::Queen, color: Color::Black }),
-                    "k" => Some(ChessPiece { piece_type: PieceType::King, color: Color::Black }),
-                    _ => None,
-                }
-            }
-        }
-        res
-    }
-}
-
-pub enum BoardError {
-    ParseFailure,
 }
