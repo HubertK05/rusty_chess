@@ -1,4 +1,4 @@
-use crate::ChessGui;
+use crate::{ChessGui, Assets};
 
 pub struct Square(pub usize, pub usize);
 
@@ -25,7 +25,7 @@ pub enum Color {
     Black,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ChessPiece {
     pub piece_type: PieceType,
     pub color: Color,
@@ -60,12 +60,12 @@ impl ToString for ChessPiece {
     }
 }
 
-impl From<[[&str; 8]; 8]> for ChessGui {
-    fn from(val: [[&str; 8]; 8]) -> Self {
-        let mut res = ChessGui::default();
+impl From<([[&str; 8]; 8], Assets)> for ChessGui {
+    fn from(val: ([[&str; 8]; 8], Assets)) -> Self {
+        let mut res = Self::new_empty(val.1);
         for rank in (0..8).rev() {
             for file in 0..8 {
-                res.board[rank][file] = match val[7 - rank][file] {
+                res.board[rank][file] = match val.0[7 - rank][file] {
                     "P" => Some(ChessPiece::new(PieceType::Pawn, Color::White)),
                     "N" => Some(ChessPiece::new(PieceType::Knight, Color::White)),
                     "B" => Some(ChessPiece::new(PieceType::Bishop, Color::White)),

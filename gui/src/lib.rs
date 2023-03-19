@@ -1,10 +1,12 @@
 pub mod models;
 use crate::models::ChessPiece;
 
-use eframe::{epaint, CreationContext};
+use eframe::epaint;
 use egui::{
-    Color32, CursorIcon, Id, InnerResponse, Label, LayerId, Order, Rect, Sense, Shape, Ui, Vec2,
+    Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape, Ui, Vec2, ColorImage,
 };
+use egui_extras::RetainedImage;
+use models::{PieceType, Color};
 
 fn board_piece(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui)) {
     let is_dragged = ui.memory(|mem| mem.is_being_dragged(id));
@@ -57,14 +59,75 @@ fn board_square<R>(ui: &mut Ui, idx: usize, body: impl FnOnce(&mut Ui) -> R) -> 
     InnerResponse::new(ret, response)
 }
 
-#[derive(Default, Clone, Debug)]
 pub struct ChessGui {
     pub board: [[Option<ChessPiece>; 8]; 8],
+    pub assets: Assets,
 }
 
+pub struct Assets {
+    pub wb: RetainedImage,
+    pub wk: RetainedImage,
+    pub wn: RetainedImage,
+    pub wp: RetainedImage,
+    pub wq: RetainedImage,
+    pub wr: RetainedImage,
+    pub bb: RetainedImage,
+    pub bk: RetainedImage,
+    pub bn: RetainedImage,
+    pub bp: RetainedImage,
+    pub bq: RetainedImage,
+    pub br: RetainedImage,
+}
+
+impl Assets {
+    pub fn new() -> Self {
+        Self {
+            wp: load_img("src/assets/wp.png", "white-pawn"),
+            bp: load_img("src/assets/bp.png", "black-pawn"),
+            wn: load_img("src/assets/wn.png", "white-knight"),
+            bn: load_img("src/assets/bn.png", "black-knight"),
+            wb: load_img("src/assets/wb.png", "white-bishop"),
+            bb: load_img("src/assets/bb.png", "black-bishop"),
+            wr: load_img("src/assets/wr.png", "white-rook"),
+            br: load_img("src/assets/br.png", "black-rook"),
+            wq: load_img("src/assets/wq.png", "white-queen"),
+            bq: load_img("src/assets/bq.png", "black-queen"),
+            wk: load_img("src/assets/wk.png", "white-king"),
+            bk: load_img("src/assets/bk.png", "black-king"),
+        }
+    }
+
+    fn display_piece(&self, ui: &mut Ui, piece_type: PieceType, color: Color) {
+        match (piece_type, color) {
+            (PieceType::Pawn, Color::White) => self.wp.show(ui),
+            (PieceType::Pawn, Color::Black) => self.bp.show(ui),
+            (PieceType::Knight, Color::White) => self.wn.show(ui),
+            (PieceType::Knight, Color::Black) => self.bn.show(ui),
+            (PieceType::Bishop, Color::White) => self.wb.show(ui),
+            (PieceType::Bishop, Color::Black) => self.bb.show(ui),
+            (PieceType::Rook, Color::White) => self.wr.show(ui),
+            (PieceType::Rook, Color::Black) => self.br.show(ui),
+            (PieceType::Queen, Color::White) => self.wq.show(ui),
+            (PieceType::Queen, Color::Black) => self.bq.show(ui),
+            (PieceType::King, Color::White) => self.wk.show(ui),
+            (PieceType::King, Color::Black) => self.bk.show(ui),
+        };
+    }
+    
+}
+
+fn load_img(path: &str, name: &str) -> RetainedImage {
+    let img = image::open(path).unwrap().to_rgba8();
+    let pixels = img.pixels().map(|x| {
+        [x.0[0], x.0[1], x.0[2], x.0[3]].into_iter()
+    }).flatten().collect::<Vec<u8>>();
+    RetainedImage::from_color_image(name, ColorImage::from_rgba_unmultiplied([60, 60], &pixels))
+}
+
+
 impl ChessGui {
-    pub fn new_game(_cc: &CreationContext) -> Self {
-        Self::from([
+    pub fn new_game(assets: Assets) -> Self {
+        Self::from(([
             ["r", "n", "b", "q", "k", "b", "n", "r"],
             ["p", "p", "p", "p", "p", "p", "p", "p"],
             [" ", " ", " ", " ", " ", " ", " ", " "],
@@ -73,7 +136,13 @@ impl ChessGui {
             [" ", " ", " ", " ", " ", " ", " ", " "],
             ["P", "P", "P", "P", "P", "P", "P", "P"],
             ["R", "N", "B", "Q", "K", "B", "N", "R"],
-        ])
+        ],
+        assets
+        ))
+    }
+
+    pub fn new_empty(assets: Assets) -> Self {
+        Self { board: [[None; 8]; 8], assets }
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
@@ -94,9 +163,7 @@ impl ChessGui {
                                         let piece_id = id_source.with(rank_idx).with(file);
                                         match sq {
                                             Some(p) => board_piece(ui, piece_id, |ui| {
-                                                ui.add(
-                                                    Label::new(p.to_string()).sense(Sense::click()),
-                                                );
+                                                self.assets.display_piece(ui, p.piece_type, p.color);
                                             }),
                                             None => {
                                                 ui.scope(|ui| ui.label("".to_string()));
@@ -123,7 +190,6 @@ impl ChessGui {
 
         if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
             if ui.input(|i| i.pointer.any_released()) {
-                println!("{:?} {:?}", source_sq, drop_sq);
                 let piece = self.board[drag_rank][drag_file].take();
                 self.board[drop_rank][drop_file] = piece;
             }
