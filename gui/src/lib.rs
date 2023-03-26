@@ -1,5 +1,7 @@
 pub mod models;
+pub mod additions;
 
+use additions::{new_bg, paint_max_rect};
 use eframe::epaint;
 use egui::{
     Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape, Ui, Vec2,
@@ -79,13 +81,17 @@ impl Board {
         let id_source = Id::new("piece id");
         let mut source_sq: Option<(usize, usize)> = None;
         let mut drop_sq: Option<(usize, usize)> = None;
-        egui::Grid::new("some id")
-            .show(ui, |ui| {
-                for (rank_idx, rank) in self.board.clone().into_iter().enumerate().rev() {
-                    ui.columns(8, |uis| {
-                        for (file, sq) in rank.clone().into_iter().enumerate() {
-                            let ui = &mut uis[file];
-                            ui.horizontal(|ui| {
+        let bg = new_bg(ui);
+        ui.allocate_ui(Vec2::splat(501.), |ui| {
+            let (outer_rect, _) = ui.allocate_exact_size(Vec2::splat(517.), Sense::hover());
+            let inner_rect = outer_rect.shrink2(Vec2::splat(8.));
+            ui.allocate_ui_at_rect(inner_rect, |ui| {
+                egui::Grid::new("some id")
+                .show(ui, |ui| {
+                    for (rank_idx, rank) in self.board.clone().into_iter().enumerate().rev() {
+                        ui.columns(8, |uis| {
+                            for (file, sq) in rank.clone().into_iter().enumerate() {
+                                let ui = &mut uis[file];
                                 let response = board_square(ui, rank_idx + file, |ui| {
                                     ui.set_min_size(Vec2::new(60., 60.));
                                     ui.set_max_size(Vec2::new(60., 60.));
@@ -95,9 +101,7 @@ impl Board {
                                             Some(p) => board_piece(ui, piece_id, |ui| {
                                                 assets.display_piece(ui, p.piece_type, p.color);
                                             }),
-                                            None => {
-                                                ui.scope(|ui| ui.label("".to_string()));
-                                            }
+                                            None => (),
                                         };
                                         if ui.memory(|mem| mem.is_being_dragged(piece_id)) {
                                             source_sq = Some((file, rank_idx));
@@ -110,13 +114,13 @@ impl Board {
                                 {
                                     drop_sq = Some((file, rank_idx));
                                 }
-                            });
-                        }
-                    });
-                    ui.end_row();
-                }
-            })
-            .response;
+                            }
+                        });
+                        ui.end_row();
+                    }
+                });
+            });
+        });
 
         if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
             if ui.input(|i| i.pointer.any_released()) {
@@ -124,5 +128,7 @@ impl Board {
                 self.board[drop_rank][drop_file] = piece;
             }
         }
+
+        paint_max_rect(ui, bg, Color32::from_rgb(128, 88, 19));
     }
 }

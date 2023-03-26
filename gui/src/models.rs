@@ -1,5 +1,8 @@
-use egui::{Ui, ColorImage, Vec2};
+use eframe::epaint::{self, RectShape};
+use egui::{Ui, ColorImage, Vec2, Sense, Color32, Shape, Grid, Button};
 use egui_extras::RetainedImage;
+
+use crate::additions::{new_bg, paint_max_rect};
 
 pub struct Square(pub usize, pub usize);
 
@@ -165,13 +168,52 @@ impl ChessGui {
     pub fn new_empty(assets: Assets, options: UserOptions) -> Self {
         Self { board: Board { board: [[None; 8]; 8] }, assets, options }
     }
+
+    pub fn ui(&mut self, ui: &mut Ui) {
+        let bg = new_bg(ui);
+        
+        ui.allocate_ui(Vec2::splat(0.), |ui| {
+            ui.horizontal(|ui| {
+                ui.add_space(15.5);
+                ui.set_max_height(600.);
+                ui.vertical(|ui| {
+                    ui.add_space(40.);
+                    ui.allocate_ui(Vec2::splat(0.), |ui| {
+                        self.board.ui(ui, &self.assets);
+                    });
+                    ui.add_space(40.);
+                });
+                ui.add_space(4.);
+                ui.vertical(|ui| {
+                    ui.allocate_ui(Vec2::new(200., 600.), |ui| {
+                        ui.add_space(73.5);
+                        if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
+                            self.board = Board::new_game();
+                        }
+                        if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
+                            self.board = Board::new_game();
+                        }
+                        if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
+                            self.board = Board::new_game();
+                        }
+                        ui.add_space(73.5);
+                    });
+                });
+                ui.add_space(12.5);
+            });
+        });
+        paint_max_rect(ui, bg, Color32::from_rgb(32, 20, 0));
+    }
 }
 
 impl eframe::App for ChessGui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.spacing_mut().item_spacing = Vec2::new(3., 3.);
-            self.board.ui(ui, &self.assets);
+            ui.scope(|ui| {
+                ui.set_max_size(Vec2::splat(600.));
+                self.ui(ui);
+            });
         });
     }
 }
