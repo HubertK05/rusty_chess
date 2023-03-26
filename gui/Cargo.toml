@@ -10,3 +10,4 @@ eframe = "0.21.3"
 egui = "0.21.0"
 egui_extras = "0.21.0"
 image = "0.24.5"
+backend = { path = "../backend" }
