@@ -2,11 +2,12 @@ pub mod models;
 pub mod additions;
 
 use additions::{new_bg, paint_max_rect};
+use backend::board_setup::models::Board;
 use eframe::epaint;
 use egui::{
     Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape, Ui, Vec2,
 };
-use models::{Board, Assets};
+use models::Assets;
 
 fn board_piece(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui)) {
     let is_dragged = ui.memory(|mem| mem.is_being_dragged(id));
@@ -59,25 +60,12 @@ fn board_square<R>(ui: &mut Ui, idx: usize, body: impl FnOnce(&mut Ui) -> R) -> 
     InnerResponse::new(ret, response)
 }
 
-impl Board {
-    pub fn new_empty() -> Self {
-        Self::default()
-    }
+pub trait ChessUi {
+    fn chess_ui(&mut self, ui: &mut Ui, assets: &Assets);
+}
 
-    pub fn new_game() -> Self {
-        Self::from([
-            ["r", "n", "b", "q", "k", "b", "n", "r"],
-            ["p", "p", "p", "p", "p", "p", "p", "p"],
-            [" ", " ", " ", " ", " ", " ", " ", " "],
-            [" ", " ", " ", " ", " ", " ", " ", " "],
-            [" ", " ", " ", " ", " ", " ", " ", " "],
-            [" ", " ", " ", " ", " ", " ", " ", " "],
-            ["P", "P", "P", "P", "P", "P", "P", "P"],
-            ["R", "N", "B", "Q", "K", "B", "N", "R"],
-        ])
-    }
-
-    pub fn ui(&mut self, ui: &mut Ui, assets: &Assets) {
+impl ChessUi for Board {
+    fn chess_ui(&mut self, ui: &mut Ui, assets: &Assets) {
         let id_source = Id::new("piece id");
         let mut source_sq: Option<(usize, usize)> = None;
         let mut drop_sq: Option<(usize, usize)> = None;
@@ -99,7 +87,7 @@ impl Board {
                                         let piece_id = id_source.with(rank_idx).with(file);
                                         match sq {
                                             Some(p) => board_piece(ui, piece_id, |ui| {
-                                                assets.display_piece(ui, p.piece_type, p.color);
+                                                assets.display_piece(ui, p.piece_type(), p.color());
                                             }),
                                             None => (),
                                         };

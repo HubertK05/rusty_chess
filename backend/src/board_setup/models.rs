@@ -122,6 +122,14 @@ pub struct Board {
 }
 
 impl Board {
+    pub fn new_empty() -> Self {
+        Board::try_from(FenNotation("8/8/8/8/8/8/8/8 w - - 0 1".to_string())).unwrap()
+    }
+
+    pub fn new_game() -> Self {
+        Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap()
+    }
+
     pub fn get_square(&self, sq: Square) -> Option<&dyn ChessPiece> {
         let Square(file_number, rank_number) = sq;
         self.board

@@ -257,6 +257,10 @@ impl Moves {
 
         Moves(res)
     }
+
+    pub fn search(self, from: Square) -> Self {
+        Self(self.0.into_iter().filter(|mov| mov.from() == from).collect())
+    }
 }
 
 impl Display for Moves {
