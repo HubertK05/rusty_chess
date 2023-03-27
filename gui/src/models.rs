@@ -1,8 +1,8 @@
-use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color}};
+use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}};
 use egui::{Ui, ColorImage, Vec2, Color32, Button};
 use egui_extras::RetainedImage;
 
-use crate::{additions::{new_bg, paint_max_rect}, ChessUi};
+use crate::{additions::{new_bg, paint_max_rect}, chess_ui};
 
 pub struct Square(pub usize, pub usize);
 
@@ -65,21 +65,39 @@ impl Assets {
 
 pub struct ChessGui {
     pub board: Board,
+    pub legal_moves: Moves,
     pub assets: Assets,
     pub options: UserOptions,
 }
 
 impl ChessGui {
     pub fn new_game(assets: Assets, options: UserOptions) -> Self {
+        let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap();
+        let legal_moves = Moves::get_all_moves(&board, Color::White);
         Self {
-            board: Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap(),
+            board,
+            legal_moves,
             assets,
             options,
         }
     }
 
     pub fn new_empty(assets: Assets, options: UserOptions) -> Self {
-        Self { board: Board::try_from(FenNotation("8/8/8/8/8/8/8/8 w - - 0 1".to_string())).unwrap(), assets, options }
+        Self {
+            board: Board::try_from(FenNotation("8/8/8/8/8/8/8/8 w - - 0 1".to_string())).unwrap(),
+            legal_moves: Moves(Vec::new()),
+            assets,
+            options
+        }
+    }
+
+    pub fn reset_game(&mut self) {
+        self.board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap();
+        self.legal_moves = Moves::get_all_moves(&self.board, Color::White);
+    }
+
+    pub fn gen_legal_moves_from_pos(&mut self, color: Color) {
+        self.legal_moves = Moves::get_all_moves(&self.board, color);
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
@@ -92,7 +110,7 @@ impl ChessGui {
                 ui.vertical(|ui| {
                     ui.add_space(40.);
                     ui.allocate_ui(Vec2::splat(0.), |ui| {
-                        self.board.chess_ui(ui, &self.assets);
+                        chess_ui(self, ui);
                     });
                     ui.add_space(40.);
                 });
@@ -101,13 +119,13 @@ impl ChessGui {
                     ui.allocate_ui(Vec2::new(200., 600.), |ui| {
                         ui.add_space(73.5);
                         if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
-                            self.board = Board::new_game();
+                            self.reset_game();
                         }
                         if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
-                            self.board = Board::new_game();
+                            self.reset_game();
                         }
                         if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
-                            self.board = Board::new_game();
+                            self.reset_game();
                         }
                         ui.add_space(73.5);
                     });

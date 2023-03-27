@@ -258,8 +258,16 @@ impl Moves {
         Moves(res)
     }
 
-    pub fn search(self, from: Square) -> Self {
-        Self(self.0.into_iter().filter(|mov| mov.from() == from).collect())
+    pub fn search_with_from(&self, from: Square) -> Self {
+        Self(self.0.iter().cloned().filter(|mov| mov.from() == from).collect())
+    }
+
+    pub fn search_with_to(&self, to: Square) -> Self {
+        Self(self.0.iter().cloned().filter(|mov| mov.to() == to).collect())
+    }
+
+    pub fn find(&self, from: Square, to: Square) -> Option<Box<dyn ChessMove>> {
+        self.0.iter().cloned().filter(|mov| mov.from() == from && mov.to() == to).next()
     }
 }
 
