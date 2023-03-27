@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}};
 use egui::{Ui, ColorImage, Vec2, Color32, Button};
 use egui_extras::RetainedImage;
@@ -66,34 +68,46 @@ impl Assets {
 pub struct ChessGui {
     pub board: Board,
     pub legal_moves: Moves,
+    pub game_state: GameState,
+    pub repetition_map: HashMap<String, usize>,
+    pub reversed: bool,
     pub assets: Assets,
-    pub options: UserOptions,
 }
 
 impl ChessGui {
-    pub fn new_game(assets: Assets, options: UserOptions) -> Self {
+    pub fn new_game(assets: Assets) -> Self {
         let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap();
         let legal_moves = Moves::get_all_moves(&board, Color::White);
         Self {
             board,
             legal_moves,
+            game_state: GameState::Ongoing,
+            repetition_map: HashMap::from([(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()).to_draw_fen(), 1)]),
+            reversed: false,
             assets,
-            options,
         }
     }
 
-    pub fn new_empty(assets: Assets, options: UserOptions) -> Self {
+    pub fn new_empty(assets: Assets) -> Self {
         Self {
             board: Board::try_from(FenNotation("8/8/8/8/8/8/8/8 w - - 0 1".to_string())).unwrap(),
             legal_moves: Moves(Vec::new()),
+            game_state: GameState::Ongoing,
+            repetition_map: HashMap::new(),
+            reversed: false,
             assets,
-            options
         }
     }
 
     pub fn reset_game(&mut self) {
         self.board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap();
         self.legal_moves = Moves::get_all_moves(&self.board, Color::White);
+        self.game_state = GameState::Ongoing;
+        self.repetition_map = HashMap::from([(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()).to_draw_fen(), 1)]);
+    }
+
+    pub fn reverse_view(&mut self) {
+        self.reversed = !self.reversed
     }
 
     pub fn gen_legal_moves_from_pos(&mut self, color: Color) {
@@ -118,14 +132,12 @@ impl ChessGui {
                 ui.vertical(|ui| {
                     ui.allocate_ui(Vec2::new(200., 600.), |ui| {
                         ui.add_space(73.5);
-                        if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
+                        if ui.add_sized(Vec2::new(200., 148.), Button::new("Reset game")).clicked() {
                             self.reset_game();
                         }
-                        if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
-                            self.reset_game();
-                        }
-                        if ui.add_sized(Vec2::new(200., 148.), Button::new("abc")).clicked() {
-                            self.reset_game();
+                        self.game_state.show(ui, self.board.turn);
+                        if ui.add_sized(Vec2::new(200., 148.), Button::new("Reverse view")).clicked() {
+                            self.reverse_view();
                         }
                         ui.add_space(73.5);
                     });
@@ -149,15 +161,37 @@ impl eframe::App for ChessGui {
     }
 }
 
-pub struct UserOptions;
+pub enum GameState {
+    Ongoing,
+    Done(String),
+}
 
-impl UserOptions {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn ui(&mut self, ui: &mut Ui) {
-        todo!()
+impl GameState {
+    fn show(&self, ui: &mut Ui, color: Color) {
+        ui.allocate_ui(Vec2::new(200., 148.), |ui| {
+            match self {
+                GameState::Ongoing => {
+                    let bg = new_bg(ui);
+                    ui.centered_and_justified(|ui| {
+                        match color {
+                            Color::White => {
+                                ui.label("White's turn");
+                                paint_max_rect(ui, bg, Color32::WHITE)
+                            },
+                            Color::Black => {
+                                ui.label("Black's turn");
+                                paint_max_rect(ui, bg, Color32::BLACK)
+                            },
+                        }
+                    });
+                },
+                GameState::Done(msg) => {
+                    ui.centered_and_justified(|ui| {
+                        ui.label(msg);
+                    });
+                },
+            }
+        });
     }
 }
 
