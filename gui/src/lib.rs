@@ -2,7 +2,7 @@ pub mod models;
 pub mod additions;
 
 use additions::{new_bg, paint_max_rect};
-use backend::{board_setup::models::FenNotation, move_generator::{models::{Moves, Square, MoveRestrictionData}, ChessPiece}};
+use backend::{board_setup::models::FenNotation, move_generator::models::{Moves, Square, MoveRestrictionData, ChessPiece}};
 use eframe::epaint::RectShape;
 use egui::{
     Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape, Ui, Vec2, layers::ShapeIdx,
@@ -68,7 +68,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                         rects[i].push(Rect::NOTHING);
                     }
                 }
-                let mut board_iter: Vec<(usize, [Option<Box<dyn ChessPiece>>; 8])> = state.board.board.clone().into_iter().enumerate().collect();
+                let mut board_iter: Vec<(usize, [Option<ChessPiece>; 8])> = state.board.board.clone().into_iter().enumerate().collect();
                 if state.reversed {
                     board_iter.reverse();
                 };
@@ -152,7 +152,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
     if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
         if ui.input(|i| i.pointer.any_released()) {
             if let Some(chosen_move) = state.legal_moves.find(Square(drag_file as i8, drag_rank as i8), Square(drop_file as i8, drop_rank as i8)) {
-                if let Err(_) = state.board.register_move(&*chosen_move) {
+                if let Err(_) = state.board.register_move(chosen_move) {
                     println!("oops, couldn't register the move");
                 };
                 state.gen_legal_moves_from_pos(state.board.turn);

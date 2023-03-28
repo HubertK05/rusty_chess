@@ -1,4 +1,4 @@
-use backend::{
+﻿use backend::{
     board_setup::models::{Board, FenNotation},
     move_generator::models::Moves,
     move_register::models::MoveType,
@@ -7,14 +7,12 @@ use backend::{
 fn test_count_moves(board: &Board, depth: u8, max_depth: u8) -> (u64, u64, u64) {
     let move_set = Moves::get_all_moves(&board, board.turn);
     if depth == max_depth - 1 {
-        let mut en_passants = move_set.0.clone();
-        let mut castles = move_set.0.clone();
-        en_passants.retain(|x| x.move_type() == MoveType::EnPassantMove);
-        castles.retain(|x| x.move_type() == MoveType::CastleMove);
+        let en_passants = move_set.0.iter().filter(|&x| x.move_type() == MoveType::EnPassantMove).count();
+        let castles = move_set.0.iter().filter(|&x| x.move_type() == MoveType::CastleMove).count();
         return (
             move_set.0.len() as u64,
-            en_passants.len() as u64,
-            castles.len() as u64,
+            en_passants as u64,
+            castles as u64,
         );
     }
 
@@ -22,8 +20,8 @@ fn test_count_moves(board: &Board, depth: u8, max_depth: u8) -> (u64, u64, u64) 
         .0
         .into_iter()
         .map(|test_move| {
-            let mut new_board = board.clone();
-            let res = new_board.register_move(&*test_move);
+            let mut new_board = *board;
+            let res = (&mut new_board).register_move(test_move);
             if res.is_err() {
                 println!("{:?}\n{}\n{:?}", res, board, test_move);
                 panic!("wtf is this?");
@@ -39,11 +37,12 @@ fn position_1() {
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into(),
     ))
     .unwrap();
-    assert_eq!(test_count_moves(&board, 0, 1), (20, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 2), (400, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 3), (8902, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 4), (197281, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 5), (4865609, 258, 0));
+    // assert_eq!(test_count_moves(&board, 0, 1), (20, 0, 0));
+    // assert_eq!(test_count_moves(&board, 0, 2), (400, 0, 0));
+    // assert_eq!(test_count_moves(&board, 0, 3), (8902, 0, 0));
+    // assert_eq!(test_count_moves(&board, 0, 4), (197281, 0, 0));
+    // assert_eq!(test_count_moves(&board, 0, 5), (4865609, 258, 0));
+    assert_eq!(test_count_moves(&board, 0, 6), (119060324, 5248, 0));
 }
 
 #[test]

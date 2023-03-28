@@ -1,6 +1,5 @@
 use crate::{
-    board_setup::models::{Board, BoardError},
-    move_register::ChessMove,
+    board_setup::models::{Board, BoardError, FenPieceType}, move_register::models::ChessMove,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -8,7 +7,7 @@ use std::{
     ops::{Add, Mul, Sub},
 };
 
-use super::restrictions::{get_attacked, get_checked, get_pins};
+use super::{restrictions::{get_attacked, get_checked, get_pins}, pawn_get_moves, knight_get_moves, bishop_get_moves, rook_get_moves, queen_get_moves, king_get_moves};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PieceType {
@@ -186,37 +185,134 @@ impl Display for Offset {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
+pub enum ChessPiece {
+    Pawn(Pawn),
+    Knight(Knight),
+    Bishop(Bishop),
+    Rook(Rook),
+    Queen(Queen),
+    King(King),
+}
+
+impl ChessPiece {
+    pub fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<ChessMove> {
+        match self {
+            ChessPiece::Pawn(piece) => pawn_get_moves(piece, board, restriction),
+            ChessPiece::Knight(piece) => knight_get_moves(piece, board, restriction),
+            ChessPiece::Bishop(piece) => bishop_get_moves(piece, board, restriction),
+            ChessPiece::Rook(piece) => rook_get_moves(piece, board, restriction),
+            ChessPiece::Queen(piece) => queen_get_moves(piece, board, restriction),
+            ChessPiece::King(piece) => king_get_moves(piece, board, restriction),
+        }
+    }
+
+    pub fn color(&self) -> Color {
+        match self {
+            ChessPiece::Pawn(piece) => piece.color,
+            ChessPiece::Knight(piece) => piece.color,
+            ChessPiece::Bishop(piece) => piece.color,
+            ChessPiece::Rook(piece) => piece.color,
+            ChessPiece::Queen(piece) => piece.color,
+            ChessPiece::King(piece) => piece.color,
+        }
+    }
+    
+    pub fn piece_type(&self) -> PieceType {
+        match self {
+            ChessPiece::Pawn(_) => PieceType::Pawn,
+            ChessPiece::Knight(_) => PieceType::Knight,
+            ChessPiece::Bishop(_) => PieceType::Bishop,
+            ChessPiece::Rook(_) => PieceType::Rook,
+            ChessPiece::Queen(_) => PieceType::Queen,
+            ChessPiece::King(_) => PieceType::King,
+        }
+    }
+    
+    pub fn fen_piece_type(&self) -> FenPieceType {
+        match (self.piece_type(), self.color()) {
+            (PieceType::Pawn, Color::White) => FenPieceType::WhitePawn,
+            (PieceType::Pawn, Color::Black) => FenPieceType::BlackPawn,
+            (PieceType::Knight, Color::White) => FenPieceType::WhiteKnight,
+            (PieceType::Knight, Color::Black) => FenPieceType::BlackKnight,
+            (PieceType::Bishop, Color::White) => FenPieceType::WhiteBishop,
+            (PieceType::Bishop, Color::Black) => FenPieceType::BlackBishop,
+            (PieceType::Rook, Color::White) => FenPieceType::WhiteRook,
+            (PieceType::Rook, Color::Black) => FenPieceType::BlackRook,
+            (PieceType::Queen, Color::White) => FenPieceType::WhiteQueen,
+            (PieceType::Queen, Color::Black) => FenPieceType::BlackQueen,
+            (PieceType::King, Color::White) => FenPieceType::WhiteKing,
+            (PieceType::King, Color::Black) => FenPieceType::BlackKing,
+        }
+    }
+    
+    pub fn set_position(&mut self, pos: Square) {
+        match self {
+            ChessPiece::Pawn(piece) => piece.position = pos,
+            ChessPiece::Knight(piece) => piece.position = pos,
+            ChessPiece::Bishop(piece) => piece.position = pos,
+            ChessPiece::Rook(piece) => piece.position = pos,
+            ChessPiece::Queen(piece) => piece.position = pos,
+            ChessPiece::King(piece) => piece.position = pos,
+        }
+    }
+    
+    pub fn mating_material_points(&self) -> u8 {
+        match self {
+            ChessPiece::Pawn(_) => 3,
+            ChessPiece::Knight(_) => 1,
+            ChessPiece::Bishop(_) => 2,
+            ChessPiece::Rook(_) => 3,
+            ChessPiece::Queen(_) => 3,
+            ChessPiece::King(_) => 0,
+        }
+    }
+}
+
+impl Display for ChessPiece {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChessPiece::Pawn(piece) => write!(f, "{piece}"),
+            ChessPiece::Knight(piece) => write!(f, "{piece}"),
+            ChessPiece::Bishop(piece) => write!(f, "{piece}"),
+            ChessPiece::Rook(piece) => write!(f, "{piece}"),
+            ChessPiece::Queen(piece) => write!(f, "{piece}"),
+            ChessPiece::King(piece) => write!(f, "{piece}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Pawn {
     pub color: Color,
     pub position: Square,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Knight {
     pub color: Color,
     pub position: Square,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Bishop {
     pub color: Color,
     pub position: Square,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Rook {
     pub color: Color,
     pub position: Square,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Queen {
     pub color: Color,
     pub position: Square,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct King {
     pub color: Color,
     pub position: Square,
@@ -235,16 +331,16 @@ pub enum MoveDir {
 }
 
 #[derive(Debug, Clone)]
-pub struct Moves(pub Vec<Box<dyn ChessMove>>);
+pub struct Moves(pub Vec<ChessMove>);
 
 impl Moves {
-    pub fn add_move(&mut self, m: Box<dyn ChessMove>) {
+    pub fn add_move(&mut self, m: ChessMove) {
         self.0.push(m);
     }
 
     pub fn get_all_moves(board: &Board, color: Color) -> Self {
         let restrictions = MoveRestrictionData::get(board, color);
-        let mut res: Vec<Box<dyn ChessMove>> = Vec::new();
+        let mut res: Vec<ChessMove> = Vec::new();
         for rank in 0..=7 {
             for file in 0..=7 {
                 if let Some(p) = board.get_square(Square(file, rank)) {
@@ -266,7 +362,7 @@ impl Moves {
         Self(self.0.iter().cloned().filter(|mov| mov.to() == to).collect())
     }
 
-    pub fn find(&self, from: Square, to: Square) -> Option<Box<dyn ChessMove>> {
+    pub fn find(&self, from: Square, to: Square) -> Option<ChessMove> {
         self.0.iter().cloned().filter(|mov| mov.from() == from && mov.to() == to).next()
     }
 }

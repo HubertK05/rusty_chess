@@ -1,13 +1,11 @@
-use std::{fmt::Display, ops::DerefMut};
+use std::fmt::Display;
 
 use crate::{
     move_generator::{
-        models::{Bishop, Color, King, Knight, Pawn, PieceType, Queen, Rook, Square},
-        ChessPiece,
+        models::{Bishop, Color, King, Knight, Pawn, PieceType, Queen, Rook, Square, ChessPiece},
     },
     move_register::{
-        models::{MoveError, MoveType},
-        ChessMove,
+        models::{MoveError, MoveType, ChessMove},
     },
 };
 
@@ -69,7 +67,7 @@ impl TryFrom<&str> for FenPieceType {
     }
 }
 
-impl TryFrom<(char, Square)> for Box<dyn ChessPiece> {
+impl TryFrom<(char, Square)> for ChessPiece {
     type Error = BoardError;
 
     fn try_from(val: (char, Square)) -> Result<Self, Self::Error> {
@@ -80,27 +78,27 @@ impl TryFrom<(char, Square)> for Box<dyn ChessPiece> {
         };
 
         match val.0.to_ascii_lowercase() {
-            'p' => Ok(Box::new(Pawn {
+            'p' => Ok(ChessPiece::Pawn(Pawn {
                 position: val.1,
                 color,
             })),
-            'n' => Ok(Box::new(Knight {
+            'n' => Ok(ChessPiece::Knight(Knight {
                 position: val.1,
                 color,
             })),
-            'k' => Ok(Box::new(King {
+            'k' => Ok(ChessPiece::King(King {
                 position: val.1,
                 color,
             })),
-            'r' => Ok(Box::new(Rook {
+            'r' => Ok(ChessPiece::Rook(Rook {
                 position: val.1,
                 color,
             })),
-            'b' => Ok(Box::new(Bishop {
+            'b' => Ok(ChessPiece::Bishop(Bishop {
                 position: val.1,
                 color,
             })),
-            'q' => Ok(Box::new(Queen {
+            'q' => Ok(ChessPiece::Queen(Queen {
                 position: val.1,
                 color,
             })),
@@ -109,9 +107,9 @@ impl TryFrom<(char, Square)> for Box<dyn ChessPiece> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Board {
-    pub board: [[Option<Box<dyn ChessPiece>>; 8]; 8],
+    pub board: [[Option<ChessPiece>; 8]; 8],
     pub turn: Color,
     pub castling: AvailableCastles,
     pub en_passant_square: Option<Square>,
@@ -130,12 +128,13 @@ impl Board {
         Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap()
     }
 
-    pub fn get_square(&self, sq: Square) -> Option<&dyn ChessPiece> {
+    pub fn get_square(&self, sq: Square) -> Option<ChessPiece> {
         let Square(file_number, rank_number) = sq;
         self.board
             .get(rank_number as usize)?
             .get(file_number as usize)?
-            .as_deref()
+            .as_ref()
+            .copied()
     }
 
     pub fn set_ep_target_square(&mut self, sq: Option<Square>) {
@@ -163,7 +162,7 @@ impl Board {
         }
     }
 
-    pub fn take_piece(&mut self, sq: Square) -> Result<Box<dyn ChessPiece>, MoveError> {
+    pub fn take_piece(&mut self, sq: Square) -> Result<ChessPiece, MoveError> {
         if !sq.is_in_bounds() {
             return Err(MoveError::OutOfBounds);
         }
@@ -172,7 +171,7 @@ impl Board {
             .ok_or(MoveError::PieceNotFound)
     }
 
-    pub fn place_piece(&mut self, mut p: Box<dyn ChessPiece>, sq: Square) -> Result<(), MoveError> {
+    pub fn place_piece(&mut self, mut p: ChessPiece, sq: Square) -> Result<(), MoveError> {
         if !sq.is_in_bounds() {
             return Err(MoveError::OutOfBounds);
         }
@@ -180,7 +179,7 @@ impl Board {
         Ok(self.board[sq.1 as usize][sq.0 as usize] = Some(p))
     }
 
-    pub fn set_castling(&mut self, m: &dyn ChessMove) {
+    pub fn set_castling(&mut self, m: ChessMove) {
         if m.from() == Square(0, 0) || m.to() == Square(0, 0) || m.from() == Square(4, 0) {
             self.castling.white_long = false;
         }
@@ -211,7 +210,7 @@ impl Board {
         self.turn = self.turn.opp();
     }
 
-    pub fn register_move(&mut self, m: &dyn ChessMove) -> Result<(), MoveError> {
+    pub fn register_move(&mut self, m: ChessMove) -> Result<(), MoveError> {
         self.increment_half_move_timer();
         match m.move_type() {
             MoveType::Capture
@@ -344,7 +343,7 @@ impl TryFrom<FenNotation> for Board {
         let mut rank = 7_usize;
         let mut file = 0_usize;
 
-        let mut board: [[Option<Box<dyn ChessPiece>>; 8]; 8] = Default::default();
+        let mut board: [[Option<ChessPiece>; 8]; 8] = Default::default();
         let mut mating_material = (0, 0);
 
         let mut white_king_pos = Square(0, 0);
@@ -364,7 +363,7 @@ impl TryFrom<FenNotation> for Board {
                 }
                 _ => {
                     let pos = Square(file as i8, rank as i8);
-                    let mut piece: Box<dyn ChessPiece> = (char, pos)
+                    let mut piece: ChessPiece = (char, pos)
                         .try_into()
                         .map_err(|_e| BoardError::ConversionFailure)?;
                     if piece.piece_type() == PieceType::King {
@@ -373,7 +372,7 @@ impl TryFrom<FenNotation> for Board {
                             Color::Black => black_king_pos = pos,
                         }
                     }
-                    piece.deref_mut().set_position(pos);
+                    piece.set_position(pos);
                     match piece.color() {
                         Color::White => mating_material.0 += piece.mating_material_points(),
                         Color::Black => mating_material.1 += piece.mating_material_points(),

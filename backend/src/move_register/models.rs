@@ -1,5 +1,7 @@
-use crate::move_generator::models::{Color, PieceType, Square};
+use crate::{move_generator::models::{Color, PieceType, Square}, board_setup::models::Board};
 use std::fmt::{self, Display};
+
+use super::{move_register_move, capture_register_move, en_passant_register_move, promotion_register_move, promotion_capture_register_move, castle_move_register_move};
 
 #[derive(Debug, PartialEq)]
 pub enum MoveError {
@@ -7,7 +9,7 @@ pub enum MoveError {
     PieceNotFound,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Move {
     pub piece: PieceType,
     pub from: Square,
@@ -20,7 +22,7 @@ impl Move {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Capture {
     pub piece: PieceType,
     pub from: Square,
@@ -33,7 +35,7 @@ impl Capture {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CastleMove {
     pub castle_type: CastleType,
 }
@@ -44,7 +46,7 @@ impl CastleMove {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum CastleType {
     WhiteShort,
     WhiteLong,
@@ -58,7 +60,7 @@ pub enum CastleLength {
     Long,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EnPassantMove {
     pub from: Square,
     pub to: Square,
@@ -70,7 +72,7 @@ impl EnPassantMove {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PromotionMove {
     pub from: Square,
     pub to: Square,
@@ -89,7 +91,7 @@ impl PromotionMove {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PromotionCapture {
     pub from: Square,
     pub to: Square,
@@ -124,6 +126,87 @@ pub enum MoveType {
     CastleMove,
     PromotionMove,
     PromotionCapture,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ChessMove {
+    Move(Move),
+    Capture(Capture),
+    CastleMove(CastleMove),
+    EnPassantMove(EnPassantMove),
+    PromotionMove(PromotionMove),
+    PromotionCapture(PromotionCapture),
+}
+
+impl ChessMove {
+    pub fn register_move(self, board: &mut Board) -> Result<(), MoveError> {
+        match self {
+            ChessMove::Move(mov) => move_register_move(mov, board),
+            ChessMove::Capture(mov) => capture_register_move(mov, board),
+            ChessMove::CastleMove(mov) => castle_move_register_move(mov, board),
+            ChessMove::EnPassantMove(mov) => en_passant_register_move(mov, board),
+            ChessMove::PromotionMove(mov) => promotion_register_move(mov, board),
+            ChessMove::PromotionCapture(mov) => promotion_capture_register_move(mov, board),
+        }
+    }
+
+    pub fn from(&self) -> Square {
+        match self {
+            ChessMove::Move(mov) => mov.from,
+            ChessMove::Capture(mov) => mov.from,
+            ChessMove::CastleMove(mov) => {
+                match mov.castle_type {
+                    CastleType::WhiteShort | CastleType::WhiteLong => Square(4, 0),
+                    CastleType::BlackShort | CastleType::BlackLong => Square(4, 7),
+                }
+            },
+            ChessMove::EnPassantMove(mov) => mov.from,
+            ChessMove::PromotionMove(mov) => mov.from,
+            ChessMove::PromotionCapture(mov) => mov.from,
+        }
+    }
+    
+    pub fn to(&self) -> Square {
+        match self {
+            ChessMove::Move(mov) => mov.to,
+            ChessMove::Capture(mov) => mov.to,
+            ChessMove::CastleMove(mov) => {
+                match mov.castle_type {
+                    CastleType::WhiteShort => Square(6, 0),
+                    CastleType::WhiteLong => Square(2, 0),
+                    CastleType::BlackShort => Square(6, 7),
+                    CastleType::BlackLong => Square(2, 7),
+                }
+            },
+            ChessMove::EnPassantMove(mov) => mov.to,
+            ChessMove::PromotionMove(mov) => mov.to,
+            ChessMove::PromotionCapture(mov) => mov.to,
+        }
+    }
+    
+    pub fn move_type(&self) -> MoveType {
+        match self {
+            ChessMove::Move(_) => MoveType::Move,
+            ChessMove::Capture(_) => MoveType::Capture,
+            ChessMove::CastleMove(_) => MoveType::CastleMove,
+            ChessMove::EnPassantMove(_) => MoveType::EnPassantMove,
+            ChessMove::PromotionMove(_) => MoveType::PromotionMove,
+            ChessMove::PromotionCapture(_) => MoveType::PromotionCapture,
+        }
+    }
+}
+
+impl Display for ChessMove {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChessMove::Move(m) => write!(f, "{m}"),
+            ChessMove::Capture(m) => write!(f, "{m}"),
+            ChessMove::CastleMove(m) => write!(f, "{m}"),
+            ChessMove::EnPassantMove(m) => write!(f, "{m}"),
+            ChessMove::PromotionMove(m) => write!(f, "{m}"),
+            ChessMove::PromotionCapture(m) => write!(f, "{m}"),
+        }
+    }
 }
 
 impl Display for Move {
