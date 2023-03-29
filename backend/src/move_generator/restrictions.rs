@@ -60,11 +60,11 @@ pub fn is_attacked(board: &Board, sq: Square, color: Color) -> bool {
                 continue
             };
 
-            if p.piece_type() == PieceType::King && p.color() == color {
+            if p.piece_type == PieceType::King && p.color == color {
                 continue;
             };
 
-            if attack_condition(offset, color, p.piece_type()) && p.color() != color {
+            if attack_condition(offset, color, p.piece_type) && p.color != color {
                 return true;
             } else {
                 break;
@@ -81,7 +81,7 @@ pub fn is_attacked(board: &Board, sq: Square, color: Color) -> bool {
             continue
         };
 
-        if attack_condition(offset, color, p.piece_type()) && p.color() != color {
+        if attack_condition(offset, color, p.piece_type) && p.color != color {
             return true;
         };
     }
@@ -114,7 +114,7 @@ pub fn get_checked(board: &Board, color: Color) -> CheckSquares {
                 continue
             };
 
-            if attack_condition(offset, color, p.piece_type()) && p.color() != color {
+            if attack_condition(offset, color, p.piece_type) && p.color != color {
                 res.squares.extend(squares);
                 res.checks_amount += 1;
             };
@@ -131,7 +131,7 @@ pub fn get_checked(board: &Board, color: Color) -> CheckSquares {
             continue
         };
 
-        if attack_condition(offset, color, p.piece_type()) && p.color() != color {
+        if attack_condition(offset, color, p.piece_type) && p.color != color {
             res.squares.insert(target_sq);
             res.checks_amount += 1;
             continue;
@@ -161,9 +161,9 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
                 continue
             };
 
-            if p.color() == color && pin_sq.is_none() {
+            if p.color == color && pin_sq.is_none() {
                 pin_sq = Some(target_sq);
-            } else if attack_condition(offset, color, p.piece_type()) && p.color() != color {
+            } else if attack_condition(offset, color, p.piece_type) && p.color != color {
                 if let Some(s) = pin_sq {
                     res.insert(s, PinDir::from(dir));
                 }
@@ -180,7 +180,7 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
             let Some(p) = board.get_square(en_passant_sq + Offset::from(dir)) else {
                 continue
             };
-            if p.piece_type() == PieceType::Pawn && p.color() == color {
+            if p.piece_type == PieceType::Pawn && p.color == color {
                 your_pawn_count += 1;
             }
         }
@@ -204,9 +204,9 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
                     continue
                 };
 
-                if p.color() == color && p.piece_type() == PieceType::Pawn && pin_sq.is_none() {
+                if p.color == color && p.piece_type == PieceType::Pawn && pin_sq.is_none() {
                     pin_sq = Some(target_sq);
-                } else if attack_condition(offset, color, p.piece_type()) && p.color() != color {
+                } else if attack_condition(offset, color, p.piece_type) && p.color != color {
                     if let Some(s) = pin_sq {
                         res.insert(s, PinDir::EnPassantBlock);
                     }
@@ -249,8 +249,8 @@ pub fn filter_with_checked(
         1 => moves
             .into_iter()
             .filter(|x| {
-                if x.move_type() != MoveType::EnPassantMove {
-                    checked.squares.contains(&x.to())
+                if x.move_type != MoveType::EnPassantMove {
+                    checked.squares.contains(&x.to)
                 } else {
                     checked.squares.len() == 1
                 }
@@ -268,8 +268,8 @@ pub fn filter_with_pins(
     moves
         .into_iter()
         .filter(|x| {
-            if let Some(dir) = pins.0.get(&x.from()) {
-                pin_condition(x.to() - x.from(), *dir)
+            if let Some(dir) = pins.0.get(&x.from) {
+                pin_condition(x.to - x.from, *dir)
             } else {
                 true
             }

@@ -7,8 +7,12 @@
 fn test_count_moves(board: &Board, depth: u8, max_depth: u8) -> (u64, u64, u64) {
     let move_set = Moves::get_all_moves(&board, board.turn);
     if depth == max_depth - 1 {
-        let en_passants = move_set.0.iter().filter(|&x| x.move_type() == MoveType::EnPassantMove).count();
-        let castles = move_set.0.iter().filter(|&x| x.move_type() == MoveType::CastleMove).count();
+        let en_passants = move_set.0.iter().filter(|&x| x.move_type == MoveType::EnPassantMove).count();
+        let castles = move_set.0.iter().filter(|&x| if let MoveType::CastleMove(_) = x.move_type {
+            true
+        } else {
+            false
+        }).count();
         return (
             move_set.0.len() as u64,
             en_passants as u64,
@@ -37,12 +41,12 @@ fn position_1() {
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into(),
     ))
     .unwrap();
-    // assert_eq!(test_count_moves(&board, 0, 1), (20, 0, 0));
-    // assert_eq!(test_count_moves(&board, 0, 2), (400, 0, 0));
-    // assert_eq!(test_count_moves(&board, 0, 3), (8902, 0, 0));
-    // assert_eq!(test_count_moves(&board, 0, 4), (197281, 0, 0));
-    // assert_eq!(test_count_moves(&board, 0, 5), (4865609, 258, 0));
-    assert_eq!(test_count_moves(&board, 0, 6), (119060324, 5248, 0));
+    assert_eq!(test_count_moves(&board, 0, 1), (20, 0, 0));
+    assert_eq!(test_count_moves(&board, 0, 2), (400, 0, 0));
+    assert_eq!(test_count_moves(&board, 0, 3), (8902, 0, 0));
+    assert_eq!(test_count_moves(&board, 0, 4), (197281, 0, 0));
+    assert_eq!(test_count_moves(&board, 0, 5), (4865609, 258, 0));
+    // assert_eq!(test_count_moves(&board, 0, 6), (119060324, 5248, 0));
 }
 
 #[test]

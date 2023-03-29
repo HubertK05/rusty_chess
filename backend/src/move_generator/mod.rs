@@ -2,16 +2,14 @@ use crate::{
     board_setup::models::{AvailableCastles, Board},
     move_register::{
         models::{
-            Capture, CastleMove, CastleType, EnPassantMove, Move, MoveType, PromotedPieceType,
-            PromotionCapture, PromotionMove, ChessMove,
+            CastleType, MoveType, PromotedPieceType, ChessMove,
         },
     },
 };
 
 use self::{
     models::{
-        Attacked, Bishop, CheckedAdd, Color, King, Knight, MoveDir, MoveRestrictionData, Offset,
-        Pawn, PieceType, PinDir, Queen, Rook, Square, ChessPiece,
+        Attacked, CheckedAdd, Color, MoveDir, MoveRestrictionData, Offset, PieceType, PinDir, Square, ChessPiece,
     },
     restrictions::{filter_with_checked, filter_with_pins},
 };
@@ -81,30 +79,31 @@ const QUEEN_MOVES: [MoveDir; 8] = [
 ];
 
 fn pawn_get_moves(
-    pawn: &Pawn,
+    pawn: &ChessPiece,
     board: &Board,
     restriction: &MoveRestrictionData,
-) -> Vec<ChessMove> {
-    let mut all_moves = get_pawn_moves(board, pawn.position, pawn.color);
+) -> impl Iterator<Item = ChessMove> {
+    let mut all_moves = Vec::new();
+    all_moves.extend(get_pawn_moves(board, pawn.position, pawn.color));
     all_moves.extend(get_pawn_captures(board, pawn.position, pawn.color));
 
     let en_passant = get_en_passant(board, pawn.position, pawn.color);
     if let Some(ep) = &en_passant {
-        if restriction.pin_squares.0.get(&ep.from()) != Some(&PinDir::EnPassantBlock) {
+        if restriction.pin_squares.0.get(&ep.from) != Some(&PinDir::EnPassantBlock) {
             all_moves.extend(en_passant);
         }
     };
 
     let all_moves = filter_with_checked(all_moves, &restriction.check_squares);
     let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
-    all_moves
+    all_moves.into_iter()
 }
 
 fn rook_get_moves(
-    rook: &Rook,
+    rook: &ChessPiece,
     board: &Board,
     restriction: &MoveRestrictionData,
-) -> Vec<ChessMove> {
+) -> impl Iterator<Item = ChessMove> {
     let mut all_moves: Vec<ChessMove> = Vec::new();
     for dir in ROOK_MOVES {
         all_moves.extend(get_move_series(
@@ -112,19 +111,19 @@ fn rook_get_moves(
             rook.position,
             dir,
             MAX_MOVES_IN_A_SERIES as u8,
-            ChessPiece::Rook(*rook),
+            *rook,
         ));
     }
     let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
     let all_moves = filter_with_checked(all_moves, &restriction.check_squares);
-    all_moves
+    all_moves.into_iter()
 }
 
 fn bishop_get_moves(
-    bishop: &Bishop,
+    bishop: &ChessPiece,
     board: &Board,
     restriction: &MoveRestrictionData,
-) -> Vec<ChessMove> {
+) -> impl Iterator<Item = ChessMove> {
     let mut all_moves: Vec<ChessMove> = Vec::new();
     for dir in BISHOP_MOVES {
         all_moves.extend(get_move_series(
@@ -132,19 +131,19 @@ fn bishop_get_moves(
             bishop.position,
             dir,
             MAX_MOVES_IN_A_SERIES as u8,
-            ChessPiece::Bishop(*bishop),
+            *bishop,
         ));
     }
     let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
     let all_moves = filter_with_checked(all_moves, &restriction.check_squares);
-    all_moves
+    all_moves.into_iter()
 }
 
 fn queen_get_moves(
-    queen: &Queen,
+    queen: &ChessPiece,
     board: &Board,
     restriction: &MoveRestrictionData,
-) -> Vec<ChessMove> {
+) -> impl Iterator<Item = ChessMove> {
     let mut all_moves: Vec<ChessMove> = Vec::new();
     for dir in QUEEN_MOVES {
         all_moves.extend(get_move_series(
@@ -152,37 +151,37 @@ fn queen_get_moves(
             queen.position,
             dir,
             MAX_MOVES_IN_A_SERIES as u8,
-            ChessPiece::Queen(*queen),
+            *queen,
         ));
     }
     let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
     let all_moves = filter_with_checked(all_moves, &restriction.check_squares);
-    all_moves
+    all_moves.into_iter()
 }
 
 fn knight_get_moves(
-    knight: &Knight,
+    knight: &ChessPiece,
     board: &Board,
     restriction: &MoveRestrictionData,
-) -> Vec<ChessMove> {
+) -> impl Iterator<Item = ChessMove> {
     let mut all_moves: Vec<ChessMove> = Vec::new();
     for offset in KNIGHT_MOVES {
-        all_moves.extend(get_move(board, knight.position, offset, ChessPiece::Knight(*knight)));
+        all_moves.extend(get_move(board, knight.position, offset, *knight));
     }
     let all_moves = filter_with_pins(all_moves, &restriction.pin_squares);
     let all_moves = filter_with_checked(all_moves, &restriction.check_squares);
-    all_moves
+    all_moves.into_iter()
 }
 
 fn king_get_moves(
-    king: &King,
+    king: &ChessPiece,
     board: &Board,
     restriction: &MoveRestrictionData,
-) -> Vec<ChessMove> {
+) -> impl Iterator<Item = ChessMove> {
     let mut all_moves: Vec<ChessMove> = Vec::new();
     for offset in KING_MOVES {
-        if let Some(m) = get_move(board, king.position, offset, ChessPiece::King(*king)) {
-            if !restriction.attacked.0.contains(&m.to()) {
+        if let Some(m) = get_move(board, king.position, offset, *king) {
+            if !restriction.attacked.0.contains(&m.to) {
                 all_moves.push(m);
             }
         }
@@ -197,7 +196,7 @@ fn king_get_moves(
         ));
     }
 
-    all_moves
+    all_moves.into_iter()
 }
 
 fn get_move_series(
@@ -206,13 +205,19 @@ fn get_move_series(
     dir: MoveDir,
     count: u8,
     piece: ChessPiece,
-) -> Vec<ChessMove> {
+) -> impl Iterator<Item = ChessMove> {
     let translation = Offset::from(dir);
     let mut res: Vec<ChessMove> = Vec::new();
     for i in 1..=count {
         let m = get_move(board, start, translation * i as i8, piece);
         let end = match m {
-            Some(ref x) if (*x).move_type() == MoveType::Move => false,
+            Some(ref x) => { 
+                if let MoveType::Move(_) = (*x).move_type {
+                    false
+                } else {
+                    true
+                }
+            },
             _ => true,
         };
         res.extend(m);
@@ -222,10 +227,10 @@ fn get_move_series(
         }
     }
 
-    res
+    res.into_iter()
 }
 
-fn get_pawn_moves(board: &Board, start: Square, color: Color) -> Vec<ChessMove> {
+fn get_pawn_moves(board: &Board, start: Square, color: Color) -> impl Iterator<Item = ChessMove> {
     let mut res: Vec<ChessMove> = Vec::new();
     let (translation, double_move_rank, promotion_rank) = match color {
         Color::White => (
@@ -253,18 +258,18 @@ fn get_pawn_moves(board: &Board, start: Square, color: Color) -> Vec<ChessMove> 
 
         if sq.1 == promotion_rank {
             for pp in PROMOTED_PIECE_TYPES {
-                res.push(ChessMove::PromotionMove(PromotionMove::new(start, sq, pp, color)));
+                res.push(ChessMove { move_type: MoveType::PromotionMove(pp), from: start, to: sq });
             }
             break;
         } else {
-            res.push(ChessMove::Move(Move::new(PieceType::Pawn, start, sq)));
+            res.push(ChessMove { move_type: MoveType::Move(PieceType::Pawn), from: start, to: sq });
         }
     }
 
-    res
+    res.into_iter()
 }
 
-fn get_pawn_captures(board: &Board, start: Square, color: Color) -> Vec<ChessMove> {
+fn get_pawn_captures(board: &Board, start: Square, color: Color) -> impl Iterator<Item = ChessMove> {
     let mut res: Vec<ChessMove> = Vec::new();
     let (pawn_captures, promotion_rank) = match color {
         Color::White => (WHITE_PAWN_CAPTURES, WHITE_PROMOTION_RANK),
@@ -280,16 +285,16 @@ fn get_pawn_captures(board: &Board, start: Square, color: Color) -> Vec<ChessMov
             continue
         };
 
-        if p.color() != color && sq.1 == promotion_rank {
+        if p.color != color && sq.1 == promotion_rank {
             for pp in PROMOTED_PIECE_TYPES {
-                res.push(ChessMove::PromotionCapture(PromotionCapture::new(start, sq, pp, color)));
+                res.push(ChessMove { move_type: MoveType::PromotionCapture(pp), from: start, to: sq });
             }
-        } else if p.color() != color {
-            res.push(ChessMove::Capture(Capture::new(PieceType::Pawn, start, sq)));
+        } else if p.color != color {
+            res.push(ChessMove { move_type: MoveType::Capture(PieceType::Pawn), from: start, to: sq });
         }
     }
 
-    res
+    res.into_iter()
 }
 
 fn get_en_passant(board: &Board, start: Square, color: Color) -> Option<ChessMove> {
@@ -297,12 +302,12 @@ fn get_en_passant(board: &Board, start: Square, color: Color) -> Option<ChessMov
     if target_sq.1 - start.1 != 0 || (target_sq.0 - start.0).abs() != 1 {
         return None;
     }
-    if board.get_square(target_sq)?.color() != color {
+    if board.get_square(target_sq)?.color != color {
         let res = match color {
             Color::White => Square(target_sq.0, target_sq.1 + 1),
             Color::Black => Square(target_sq.0, target_sq.1 - 1),
         };
-        Some(ChessMove::EnPassantMove(EnPassantMove::new(start, res)))
+        Some(ChessMove { move_type: MoveType::EnPassantMove, from: start, to: res })
     } else {
         None
     }
@@ -316,9 +321,9 @@ fn get_move(
 ) -> Option<ChessMove> {
     let sq = start.c_add(offset)?;
     match board.get_square(sq) {
-        Some(p) if p.color() == piece.color() => None,
-        Some(_) => Some(ChessMove::Capture(Capture::new(piece.piece_type(), start, sq))),
-        None => Some(ChessMove::Move(Move::new(piece.piece_type(), start, sq))),
+        Some(p) if p.color == piece.color => None,
+        Some(_) => Some(ChessMove { move_type: MoveType::Capture(piece.piece_type), from: start, to: sq }),
+        None => Some(ChessMove { move_type: MoveType::Move(piece.piece_type), from: start, to: sq }),
     }
 }
 
@@ -328,42 +333,42 @@ fn get_castles(
     castles: &AvailableCastles,
     attacked: &Attacked,
     color: Color,
-) -> Vec<ChessMove> {
+) -> impl Iterator<Item = ChessMove> {
     let mut res: Vec<ChessMove> = Vec::new();
     let Attacked(set) = &attacked;
     if color == Color::White
         && castles.white_short
         && [pos + Offset(1, 0), pos + Offset(2, 0)]
-            .into_iter()
-            .all(|x| !set.contains(&x) && board.get_square(x).is_none())
+            .iter()
+            .all(|x| !set.contains(&x) && board.get_square(*x).is_none())
     {
-        res.push(ChessMove::CastleMove(CastleMove::new(CastleType::WhiteShort)));
+        res.push(ChessMove { move_type: MoveType::CastleMove(CastleType::WhiteShort), from: Square(4, 0), to: Square(6, 0) });
     }
     if color == Color::White
         && castles.white_long
         && [pos + Offset(-1, 0), pos + Offset(-2, 0)]
-            .into_iter()
-            .all(|x| !set.contains(&x) && board.get_square(x).is_none())
+            .iter()
+            .all(|x| !set.contains(&x) && board.get_square(*x).is_none())
         && board.get_square(pos + Offset(-3, 0)).is_none()
     {
-        res.push(ChessMove::CastleMove(CastleMove::new(CastleType::WhiteLong)));
+        res.push(ChessMove { move_type: MoveType::CastleMove(CastleType::WhiteLong), from: Square(4, 0), to: Square(2, 0) });
     }
     if color == Color::Black
         && castles.black_short
         && [pos + Offset(1, 0), pos + Offset(2, 0)]
-            .into_iter()
-            .all(|x| !set.contains(&x) && board.get_square(x).is_none())
+            .iter()
+            .all(|x| !set.contains(&x) && board.get_square(*x).is_none())
     {
-        res.push(ChessMove::CastleMove(CastleMove::new(CastleType::BlackShort)));
+        res.push(ChessMove { move_type: MoveType::CastleMove(CastleType::BlackShort), from: Square(4, 7), to: Square(6, 7) });
     }
     if color == Color::Black
         && castles.black_long
         && [pos + Offset(-1, 0), pos + Offset(-2, 0)]
-            .into_iter()
-            .all(|x| !set.contains(&x) && board.get_square(x).is_none())
+            .iter()
+            .all(|x| !set.contains(&x) && board.get_square(*x).is_none())
         && board.get_square(pos + Offset(-3, 0)).is_none()
     {
-        res.push(ChessMove::CastleMove(CastleMove::new(CastleType::BlackLong)));
+        res.push(ChessMove { move_type: MoveType::CastleMove(CastleType::BlackLong), from: Square(4, 7), to: Square(2, 7) });
     }
-    res
+    res.into_iter()
 }

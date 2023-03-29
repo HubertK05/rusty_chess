@@ -3,7 +3,7 @@ use crate::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    fmt::{self, Display},
+    fmt::{self, Display, Debug},
     ops::{Add, Mul, Sub},
 };
 
@@ -186,51 +186,26 @@ impl Display for Offset {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum ChessPiece {
-    Pawn(Pawn),
-    Knight(Knight),
-    Bishop(Bishop),
-    Rook(Rook),
-    Queen(Queen),
-    King(King),
+pub struct ChessPiece {
+    pub piece_type: PieceType,
+    pub color: Color,
+    pub position: Square,
 }
 
 impl ChessPiece {
     pub fn get_moves(&self, board: &Board, restriction: &MoveRestrictionData) -> Vec<ChessMove> {
-        match self {
-            ChessPiece::Pawn(piece) => pawn_get_moves(piece, board, restriction),
-            ChessPiece::Knight(piece) => knight_get_moves(piece, board, restriction),
-            ChessPiece::Bishop(piece) => bishop_get_moves(piece, board, restriction),
-            ChessPiece::Rook(piece) => rook_get_moves(piece, board, restriction),
-            ChessPiece::Queen(piece) => queen_get_moves(piece, board, restriction),
-            ChessPiece::King(piece) => king_get_moves(piece, board, restriction),
-        }
-    }
-
-    pub fn color(&self) -> Color {
-        match self {
-            ChessPiece::Pawn(piece) => piece.color,
-            ChessPiece::Knight(piece) => piece.color,
-            ChessPiece::Bishop(piece) => piece.color,
-            ChessPiece::Rook(piece) => piece.color,
-            ChessPiece::Queen(piece) => piece.color,
-            ChessPiece::King(piece) => piece.color,
-        }
-    }
-    
-    pub fn piece_type(&self) -> PieceType {
-        match self {
-            ChessPiece::Pawn(_) => PieceType::Pawn,
-            ChessPiece::Knight(_) => PieceType::Knight,
-            ChessPiece::Bishop(_) => PieceType::Bishop,
-            ChessPiece::Rook(_) => PieceType::Rook,
-            ChessPiece::Queen(_) => PieceType::Queen,
-            ChessPiece::King(_) => PieceType::King,
+        match self.piece_type {
+            PieceType::Pawn => pawn_get_moves(self, board, restriction).collect(),
+            PieceType::Knight => knight_get_moves(self, board, restriction).collect(),
+            PieceType::Bishop => bishop_get_moves(self, board, restriction).collect(),
+            PieceType::Rook => rook_get_moves(self, board, restriction).collect(),
+            PieceType::Queen => queen_get_moves(self, board, restriction).collect(),
+            PieceType::King => king_get_moves(self, board, restriction).collect(),
         }
     }
     
     pub fn fen_piece_type(&self) -> FenPieceType {
-        match (self.piece_type(), self.color()) {
+        match (self.piece_type, self.color) {
             (PieceType::Pawn, Color::White) => FenPieceType::WhitePawn,
             (PieceType::Pawn, Color::Black) => FenPieceType::BlackPawn,
             (PieceType::Knight, Color::White) => FenPieceType::WhiteKnight,
@@ -247,75 +222,25 @@ impl ChessPiece {
     }
     
     pub fn set_position(&mut self, pos: Square) {
-        match self {
-            ChessPiece::Pawn(piece) => piece.position = pos,
-            ChessPiece::Knight(piece) => piece.position = pos,
-            ChessPiece::Bishop(piece) => piece.position = pos,
-            ChessPiece::Rook(piece) => piece.position = pos,
-            ChessPiece::Queen(piece) => piece.position = pos,
-            ChessPiece::King(piece) => piece.position = pos,
-        }
+        self.position = pos;
     }
     
     pub fn mating_material_points(&self) -> u8 {
-        match self {
-            ChessPiece::Pawn(_) => 3,
-            ChessPiece::Knight(_) => 1,
-            ChessPiece::Bishop(_) => 2,
-            ChessPiece::Rook(_) => 3,
-            ChessPiece::Queen(_) => 3,
-            ChessPiece::King(_) => 0,
+        match self.piece_type {
+            PieceType::Pawn => 3,
+            PieceType::Knight => 1,
+            PieceType::Bishop => 2,
+            PieceType::Rook => 3,
+            PieceType::Queen => 3,
+            PieceType::King => 0,
         }
     }
 }
 
 impl Display for ChessPiece {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ChessPiece::Pawn(piece) => write!(f, "{piece}"),
-            ChessPiece::Knight(piece) => write!(f, "{piece}"),
-            ChessPiece::Bishop(piece) => write!(f, "{piece}"),
-            ChessPiece::Rook(piece) => write!(f, "{piece}"),
-            ChessPiece::Queen(piece) => write!(f, "{piece}"),
-            ChessPiece::King(piece) => write!(f, "{piece}"),
-        }
+        self.fen_piece_type().fmt(f)
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Pawn {
-    pub color: Color,
-    pub position: Square,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Knight {
-    pub color: Color,
-    pub position: Square,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Bishop {
-    pub color: Color,
-    pub position: Square,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Rook {
-    pub color: Color,
-    pub position: Square,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Queen {
-    pub color: Color,
-    pub position: Square,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct King {
-    pub color: Color,
-    pub position: Square,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -344,7 +269,7 @@ impl Moves {
         for rank in 0..=7 {
             for file in 0..=7 {
                 if let Some(p) = board.get_square(Square(file, rank)) {
-                    if p.color() == color {
+                    if p.color == color {
                         res.extend(p.get_moves(board, &restrictions));
                     }
                 }
@@ -355,15 +280,15 @@ impl Moves {
     }
 
     pub fn search_with_from(&self, from: Square) -> Self {
-        Self(self.0.iter().cloned().filter(|mov| mov.from() == from).collect())
+        Self(self.0.iter().cloned().filter(|mov| mov.from == from).collect())
     }
 
     pub fn search_with_to(&self, to: Square) -> Self {
-        Self(self.0.iter().cloned().filter(|mov| mov.to() == to).collect())
+        Self(self.0.iter().cloned().filter(|mov| mov.to == to).collect())
     }
 
     pub fn find(&self, from: Square, to: Square) -> Option<ChessMove> {
-        self.0.iter().cloned().filter(|mov| mov.from() == from && mov.to() == to).next()
+        self.0.iter().cloned().filter(|mov| mov.from == from && mov.to == to).next()
     }
 }
 
@@ -448,60 +373,6 @@ impl MoveRestrictionData {
             attacked: get_attacked(board, color),
             check_squares: get_checked(board, color),
             pin_squares: get_pins(board, color),
-        }
-    }
-}
-
-impl Display for Pawn {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.color {
-            Color::Black => write!(f, "p"),
-            Color::White => write!(f, "P"),
-        }
-    }
-}
-
-impl Display for Knight {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.color {
-            Color::Black => write!(f, "n"),
-            Color::White => write!(f, "N"),
-        }
-    }
-}
-
-impl Display for King {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.color {
-            Color::Black => write!(f, "k"),
-            Color::White => write!(f, "K"),
-        }
-    }
-}
-
-impl Display for Rook {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.color {
-            Color::Black => write!(f, "r"),
-            Color::White => write!(f, "R"),
-        }
-    }
-}
-
-impl Display for Bishop {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.color {
-            Color::Black => write!(f, "b"),
-            Color::White => write!(f, "B"),
-        }
-    }
-}
-
-impl Display for Queen {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.color {
-            Color::Black => write!(f, "q"),
-            Color::White => write!(f, "Q"),
         }
     }
 }

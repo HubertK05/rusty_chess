@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
     move_generator::{
-        models::{Bishop, Color, King, Knight, Pawn, PieceType, Queen, Rook, Square, ChessPiece},
+        models::{Color, PieceType, Square, ChessPiece},
     },
     move_register::{
         models::{MoveError, MoveType, ChessMove},
@@ -77,33 +77,21 @@ impl TryFrom<(char, Square)> for ChessPiece {
             Color::White
         };
 
-        match val.0.to_ascii_lowercase() {
-            'p' => Ok(ChessPiece::Pawn(Pawn {
-                position: val.1,
-                color,
-            })),
-            'n' => Ok(ChessPiece::Knight(Knight {
-                position: val.1,
-                color,
-            })),
-            'k' => Ok(ChessPiece::King(King {
-                position: val.1,
-                color,
-            })),
-            'r' => Ok(ChessPiece::Rook(Rook {
-                position: val.1,
-                color,
-            })),
-            'b' => Ok(ChessPiece::Bishop(Bishop {
-                position: val.1,
-                color,
-            })),
-            'q' => Ok(ChessPiece::Queen(Queen {
-                position: val.1,
-                color,
-            })),
-            _ => Err(BoardError::ConversionFailure),
-        }
+        let piece_type = match val.0.to_ascii_lowercase() {
+            'p' => PieceType::Pawn,
+            'n' => PieceType::Knight,
+            'k' => PieceType::King,
+            'r' => PieceType::Rook,
+            'b' => PieceType::Bishop,
+            'q' => PieceType::Queen,
+            _ => return Err(BoardError::ConversionFailure),
+        };
+
+        Ok(ChessPiece {
+            piece_type,
+            position: val.1,
+            color,
+        })
     }
 }
 
@@ -180,16 +168,16 @@ impl Board {
     }
 
     pub fn set_castling(&mut self, m: ChessMove) {
-        if m.from() == Square(0, 0) || m.to() == Square(0, 0) || m.from() == Square(4, 0) {
+        if m.from == Square(0, 0) || m.to == Square(0, 0) || m.from == Square(4, 0) {
             self.castling.white_long = false;
         }
-        if m.from() == Square(7, 0) || m.to() == Square(7, 0) || m.from() == Square(4, 0) {
+        if m.from == Square(7, 0) || m.to == Square(7, 0) || m.from == Square(4, 0) {
             self.castling.white_short = false;
         }
-        if m.from() == Square(0, 7) || m.to() == Square(0, 7) || m.from() == Square(4, 7) {
+        if m.from == Square(0, 7) || m.to == Square(0, 7) || m.from == Square(4, 7) {
             self.castling.black_long = false;
         }
-        if m.from() == Square(7, 7) || m.to() == Square(7, 7) || m.from() == Square(4, 7) {
+        if m.from == Square(7, 7) || m.to == Square(7, 7) || m.from == Square(4, 7) {
             self.castling.black_short = false;
         }
     }
@@ -212,11 +200,11 @@ impl Board {
 
     pub fn register_move(&mut self, m: ChessMove) -> Result<(), MoveError> {
         self.increment_half_move_timer();
-        match m.move_type() {
-            MoveType::Capture
+        match m.move_type {
+            MoveType::Capture(_)
             | MoveType::EnPassantMove
-            | MoveType::PromotionMove
-            | MoveType::PromotionCapture => self.reset_half_move_timer(),
+            | MoveType::PromotionMove(_)
+            | MoveType::PromotionCapture(_) => self.reset_half_move_timer(),
             _ => (),
         };
 
@@ -366,14 +354,14 @@ impl TryFrom<FenNotation> for Board {
                     let mut piece: ChessPiece = (char, pos)
                         .try_into()
                         .map_err(|_e| BoardError::ConversionFailure)?;
-                    if piece.piece_type() == PieceType::King {
-                        match piece.color() {
+                    if piece.piece_type == PieceType::King {
+                        match piece.color {
                             Color::White => white_king_pos = pos,
                             Color::Black => black_king_pos = pos,
                         }
                     }
                     piece.set_position(pos);
-                    match piece.color() {
+                    match piece.color {
                         Color::White => mating_material.0 += piece.mating_material_points(),
                         Color::Black => mating_material.1 += piece.mating_material_points(),
                     }

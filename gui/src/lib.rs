@@ -96,7 +96,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                                     let piece_id = id_source.with(rank_idx).with(file);
                                     match sq {
                                         Some(p) => board_piece(ui, piece_id, |ui| {
-                                            state.assets.display_piece(ui, p.piece_type(), p.color());
+                                            state.assets.display_piece(ui, p.piece_type, p.color);
                                         }),
                                         None => (),
                                     };
