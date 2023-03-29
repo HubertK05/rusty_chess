@@ -25,8 +25,8 @@ pub enum FenPieceType {
     BlackKing,
 }
 
-impl ToString for FenPieceType {
-    fn to_string(&self) -> String {
+impl Display for FenPieceType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
             FenPieceType::WhitePawn => "P",
             FenPieceType::WhiteKnight => "N",
@@ -41,7 +41,7 @@ impl ToString for FenPieceType {
             FenPieceType::BlackQueen => "q",
             FenPieceType::BlackKing => "k",
         };
-        str.into()
+        write!(f, "{}", str)
     }
 }
 

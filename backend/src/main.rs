@@ -1,10 +1,14 @@
 use backend::{
-    board_setup::models::{Board, FenNotation}, move_generator::{models::{Moves, Color, PieceType, Square, ChessPiece, MoveRestrictionData}, restrictions::{get_attacked, get_checked, get_pins}},
+    board_setup::models::{Board, FenNotation}, move_generator::{models::{Moves, Color, PieceType, Square, ChessPiece, MoveRestrictionData}, restrictions::{get_attacked, get_checked, get_pins}}, move_register::models::{MoveType, ChessMove},
 };
 use easybench::bench;
 
 fn main() {
     let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
+    // let board = Board::try_from(FenNotation("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1".into())).unwrap();
+
+    let mut a = Vec::new();
+    println!("push a chess move - {}", bench(|| a.push(ChessMove { move_type: MoveType::Move(PieceType::Pawn), from: Square(4, 1), to: Square(4, 2) })));
 
     println!("attacked - {}", bench(|| get_attacked(&board, Color::White)));
     println!("checked - {}", bench(|| get_checked(&board, Color::White)));
@@ -14,7 +18,7 @@ fn main() {
     println!("all restrictions - {}", bench(|| MoveRestrictionData::get(&board, Color::White)));
 
     let pawn = ChessPiece { piece_type: PieceType::Pawn, position: Square(4, 1), color: Color::White};
-    println!("pawn moves (x8) - {}", bench(|| pawn.get_moves(&board, &restrictions)));
+    println!("all pawn moves (x8) - {}", bench(|| pawn.get_moves(&board, &restrictions)));
 
     let knight = ChessPiece { piece_type: PieceType::Knight, position: Square(1, 0), color: Color::White};
     println!("knight moves (x2) - {}", bench(|| knight.get_moves(&board, &restrictions)));

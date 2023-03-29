@@ -76,7 +76,10 @@ pub struct ChessGui {
 
 impl ChessGui {
     pub fn new_game(assets: Assets) -> Self {
-        let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap();
+        let board = Board::try_from(FenNotation(
+            "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1".into(),
+        ))
+        .unwrap();
         let legal_moves = Moves::get_all_moves(&board, Color::White);
         Self {
             board,
@@ -100,7 +103,10 @@ impl ChessGui {
     }
 
     pub fn reset_game(&mut self) {
-        self.board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap();
+        self.board = Board::try_from(FenNotation(
+            "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1".into(),
+        ))
+        .unwrap();
         self.legal_moves = Moves::get_all_moves(&self.board, Color::White);
         self.game_state = GameState::Ongoing;
         self.repetition_map = HashMap::from([(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()).to_draw_fen(), 1)]);

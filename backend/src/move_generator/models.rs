@@ -239,7 +239,7 @@ impl ChessPiece {
 
 impl Display for ChessPiece {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fen_piece_type().fmt(f)
+        std::fmt::Display::fmt(&self.fen_piece_type(), f)
     }
 }
 

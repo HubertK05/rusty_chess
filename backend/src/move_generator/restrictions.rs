@@ -101,21 +101,25 @@ pub fn get_checked(board: &Board, color: Color) -> CheckSquares {
     };
 
     for dir in QUEEN_MOVES {
-        let mut squares = HashSet::new();
+        let mut squares: [Option<Square>; 7] = [None; 7];
         for i in 1..=MAX_MOVES_IN_A_SERIES {
             let offset = Offset::from(dir) * i as i8;
             let Some(target_sq) = sq.c_add(offset) else {
                 break
             };
 
-            squares.insert(target_sq);
+            squares[i - 1] = Some(target_sq);
 
             let Some(p) = board.get_square(target_sq) else {
                 continue
             };
 
             if attack_condition(offset, color, p.piece_type) && p.color != color {
-                res.squares.extend(squares);
+                for elem in squares {
+                    if let Some(sq) = elem {
+                        res.squares.insert(sq);
+                    };
+                };
                 res.checks_amount += 1;
             };
             break;
@@ -176,12 +180,14 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
 
     if let Some(en_passant_sq) = board.en_passant_square {
         let mut your_pawn_count = 0;
+        let mut your_pawn_pos = None;
         for dir in [MoveDir::Left, MoveDir::Right] {
             let Some(p) = board.get_square(en_passant_sq + Offset::from(dir)) else {
                 continue
             };
             if p.piece_type == PieceType::Pawn && p.color == color {
                 your_pawn_count += 1;
+                your_pawn_pos = Some(p.position);
             }
         }
         if your_pawn_count != 1 {
@@ -208,7 +214,9 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
                     pin_sq = Some(target_sq);
                 } else if attack_condition(offset, color, p.piece_type) && p.color != color {
                     if let Some(s) = pin_sq {
-                        res.insert(s, PinDir::EnPassantBlock);
+                        if pin_sq == your_pawn_pos {
+                            res.insert(s, PinDir::EnPassantBlock);
+                        }
                     }
                     break;
                 } else {
@@ -277,7 +285,7 @@ pub fn filter_with_pins(
         .collect()
 }
 
-fn pin_condition(offset: Offset, pin_dir: PinDir) -> bool {
+const fn pin_condition(offset: Offset, pin_dir: PinDir) -> bool {
     match pin_dir {
         PinDir::Vertical => offset.0 == 0,
         PinDir::Horizontal => offset.1 == 0,
