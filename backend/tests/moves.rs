@@ -1,8 +1,40 @@
-﻿use backend::{
+﻿use std::thread;
+
+use backend::{
     board_setup::models::{Board, FenNotation},
     move_generator::models::Moves,
     move_register::models::MoveType,
 };
+
+fn start_test(board: &Board, max_depth: u8) -> (u64, u64, u64, u64) {
+    let Moves(move_set) = Moves::get_all_moves(&board, board.turn);
+    let mut res = (0, 0, 0, 0);
+    let mut threads = Vec::new();
+    let mut batches = vec![vec![]; 4];
+    let batches_len = batches.len();
+    for (i, m) in move_set.into_iter().enumerate() {
+        batches[i % batches_len].push(m);
+    }
+    for batch in batches {
+        let new_board = *board;
+        let part_res = thread::spawn(move || {
+            let mut res = (0, 0, 0, 0);
+            for elem in batch {
+                let mut another_board = new_board;
+                (&mut another_board).register_move(elem).unwrap();
+                let part_res = test_count_moves(&another_board, 1, max_depth);
+                res = (res.0 + part_res.0, res.1 + part_res.1, res.2 + part_res.2, res.3 + part_res.3);
+            };
+            res
+        });
+        threads.push(part_res);
+    }
+    for elem in threads {
+        let part_res = elem.join().unwrap();
+        res = (res.0 + part_res.0, res.1 + part_res.1, res.2 + part_res.2, res.3 + part_res.3);
+    }
+    res
+}
 
 fn test_count_moves(board: &Board, depth: u8, max_depth: u8) -> (u64, u64, u64, u64) {
     let move_set = Moves::get_all_moves(&board, board.turn);
@@ -51,11 +83,11 @@ fn position_1() {
     ))
     .unwrap();
     assert_eq!(test_count_moves(&board, 0, 1), (20, 0, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 2), (400, 0, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 3), (8902, 0, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 4), (197281, 0, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 5), (4865609, 258, 0, 0));
-    // assert_eq!(test_count_moves(&board, 0, 6), (119060324, 5248, 0, 0));
+    assert_eq!(start_test(&board, 2), (400, 0, 0, 0));
+    assert_eq!(start_test(&board, 3), (8902, 0, 0, 0));
+    assert_eq!(start_test(&board, 4), (197281, 0, 0, 0));
+    assert_eq!(start_test(&board, 5), (4865609, 258, 0, 0));
+    assert_eq!(start_test(&board, 6), (119060324, 5248, 0, 0));
 }
 
 #[test]
@@ -65,10 +97,10 @@ fn position_2() {
     ))
     .unwrap();
     assert_eq!(test_count_moves(&board, 0, 1), (48, 0, 2, 0));
-    assert_eq!(test_count_moves(&board, 0, 2), (2039, 1, 91, 0));
-    assert_eq!(test_count_moves(&board, 0, 3), (97862, 45, 3162, 0));
-    assert_eq!(test_count_moves(&board, 0, 4), (4085603, 1929, 128013, 15172));
-    // assert_eq!(test_count_moves(&board, 0, 5), (193690690, 73365, 4993637, 8392));
+    assert_eq!(start_test(&board, 2), (2039, 1, 91, 0));
+    assert_eq!(start_test(&board, 3), (97862, 45, 3162, 0));
+    assert_eq!(start_test(&board, 4), (4085603, 1929, 128013, 15172));
+    assert_eq!(start_test(&board, 5), (193690690, 73365, 4993637, 8392));
 }
 
 #[test]
@@ -78,12 +110,12 @@ fn position_3() {
     ))
     .unwrap();
     assert_eq!(test_count_moves(&board, 0, 1), (14, 0, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 2), (191, 0, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 3), (2812, 2, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 4), (43238, 123, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 5), (674624, 1165, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 6), (11030083, 33325, 0, 7552));
-    // assert_eq!(test_count_moves(&board, 0, 7), (178633661, 294874, 0, 140024));
+    assert_eq!(start_test(&board, 2), (191, 0, 0, 0));
+    assert_eq!(start_test(&board, 3), (2812, 2, 0, 0));
+    assert_eq!(start_test(&board, 4), (43238, 123, 0, 0));
+    assert_eq!(start_test(&board, 5), (674624, 1165, 0, 0));
+    assert_eq!(start_test(&board, 6), (11030083, 33325, 0, 7552));
+    assert_eq!(start_test(&board, 7), (178633661, 294874, 0, 140024));
 }
 
 #[test]
@@ -93,10 +125,10 @@ fn position_4() {
     ))
     .unwrap();
     assert_eq!(test_count_moves(&board, 0, 1), (6, 0, 0, 0));
-    assert_eq!(test_count_moves(&board, 0, 2), (264, 0, 6, 48));
-    assert_eq!(test_count_moves(&board, 0, 3), (9467, 4, 0, 120));
-    assert_eq!(test_count_moves(&board, 0, 4), (422333, 0, 7795, 60032));
-    assert_eq!(test_count_moves(&board, 0, 5), (15833292, 6512, 0, 329464));
+    assert_eq!(start_test(&board, 2), (264, 0, 6, 48));
+    assert_eq!(start_test(&board, 3), (9467, 4, 0, 120));
+    assert_eq!(start_test(&board, 4), (422333, 0, 7795, 60032));
+    assert_eq!(start_test(&board, 5), (15833292, 6512, 0, 329464));
 }
 
 #[test]
@@ -106,10 +138,10 @@ fn position_5() {
     ))
     .unwrap();
     assert_eq!(test_count_moves(&board, 0, 1).0, 44);
-    assert_eq!(test_count_moves(&board, 0, 2).0, 1486);
-    assert_eq!(test_count_moves(&board, 0, 3).0, 62379);
-    assert_eq!(test_count_moves(&board, 0, 4).0, 2103487);
-    // assert_eq!(test_count_moves(&board, 0, 5).0, 89941194);
+    assert_eq!(start_test(&board, 2).0, 1486);
+    assert_eq!(start_test(&board, 3).0, 62379);
+    assert_eq!(start_test(&board, 4).0, 2103487);
+    assert_eq!(start_test(&board, 5).0, 89941194);
 }
 
 #[test]
@@ -119,8 +151,8 @@ fn position_6() {
     ))
     .unwrap();
     assert_eq!(test_count_moves(&board, 0, 1).0, 46);
-    assert_eq!(test_count_moves(&board, 0, 2).0, 2079);
-    assert_eq!(test_count_moves(&board, 0, 3).0, 89890);
-    assert_eq!(test_count_moves(&board, 0, 4).0, 3894594);
-    // assert_eq!(test_count_moves(&board, 0, 5).0, 164075551);
+    assert_eq!(start_test(&board, 2).0, 2079);
+    assert_eq!(start_test(&board, 3).0, 89890);
+    assert_eq!(start_test(&board, 4).0, 3894594);
+    assert_eq!(start_test(&board, 5).0, 164075551);
 }
