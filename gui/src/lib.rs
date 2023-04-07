@@ -2,12 +2,12 @@ pub mod models;
 pub mod additions;
 
 use additions::{new_bg, paint_max_rect};
-use backend::{board_setup::models::FenNotation, move_generator::models::{Moves, Square, MoveRestrictionData, ChessPiece}};
+use backend::{board_setup::models::FenNotation, move_generator::models::{Moves, Square, MoveRestrictionData, ChessPiece}, chess_bot::choose_move, move_register::models::{ChessMove, MoveError}};
 use eframe::epaint::RectShape;
 use egui::{
     Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape, Ui, Vec2, layers::ShapeIdx,
 };
-use models::{ChessGui, GameState};
+use models::{ChessGui, GameState, BotTimer, BotState};
 
 fn board_piece(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui)) {
     let is_dragged = ui.memory(|mem| mem.is_being_dragged(id));
@@ -123,7 +123,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                         let color = {
                             if let Some(destinations) = &legal_destinations {
                                 let Moves(filtered_moves) = destinations.search_with_to(Square(file as i8, rank as i8));
-                                if filtered_moves.len() != 0 {
+                                if filtered_moves.len() != 0 && state.bot_state.timer == BotTimer::Idle {
                                     Color32::from_rgb(128, 0, 0)
                                 } else if (file + rank) % 2 == 0 {
                                     Color32::from_rgb(78, 44, 0)
@@ -149,33 +149,63 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
         });
     });
 
-    if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
-        if ui.input(|i| i.pointer.any_released()) {
-            if let Some(chosen_move) = state.legal_moves.find(Square(drag_file as i8, drag_rank as i8), Square(drop_file as i8, drop_rank as i8)) {
-                if let Err(_) = state.board.register_move(chosen_move) {
-                    println!("oops, couldn't register the move");
-                };
-                state.gen_legal_moves_from_pos(state.board.turn);
-                let position_count = *state.repetition_map.entry(FenNotation::from(&state.board).to_draw_fen()).and_modify(|x| *x += 1).or_insert(1);
-                if state.board.half_move_timer_50 > 100 {
-                    state.game_state = GameState::Done("Draw by the 50 move rule".into());
-                }
-                else if state.board.mating_material.0 < 3 && state.board.mating_material.1 < 3 {
-                    state.game_state = GameState::Done("Draw by insufficitent mating material".into());
-                }
-                else if state.legal_moves.0.is_empty() {
-                    if MoveRestrictionData::get(&state.board, state.board.turn).check_squares.checks_amount != 0 {
-                        state.game_state = GameState::Done(format!("{} wins by checkmate", state.board.turn.opp().to_string()));
-                    } else {
-                        state.game_state = GameState::Done("Draw by stalemate".into());
+    if state.game_state.is_ongoing() && state.bot_state.timer == BotTimer::Idle {
+        if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
+            if ui.input(|i| i.pointer.any_released()) {
+                if let Some(chosen_move) = state.legal_moves.find(Square(drag_file as i8, drag_rank as i8), Square(drop_file as i8, drop_rank as i8)) {
+                    play_move(state, chosen_move).expect("oops, couldn't play the move");
+
+                    if state.game_state.is_ongoing() {
+                        let board = state.board;
+                        let chosen_move = std::thread::spawn(move || {
+                            choose_move(&board).expect("oops, failed to choose a move")
+                        });
+                        state.bot_state = BotState {
+                            thread: Some(chosen_move),
+                            timer: BotTimer::Pending,
+                        };
                     }
-                }
-                else if position_count >= 3 {
-                    state.game_state = GameState::Done("Draw by threefold repetition".into());
                 }
             }
         }
     }
 
+    let thread = state.bot_state.thread.take();
+    if let Some(th) = thread {
+        if th.is_finished() {
+            let chosen_move = th.join().unwrap();
+            play_move(state, chosen_move).expect("oops, couldn't play the move");
+            state.bot_state.timer = BotTimer::Idle;
+        } else {
+            state.bot_state.thread = Some(th)
+        }
+    }
     paint_max_rect(ui, bg, Color32::from_rgb(128, 88, 19))
+}
+
+fn play_move(state: &mut ChessGui, chosen_move: ChessMove) -> Result<(), MoveError> {
+    state.board.register_move(chosen_move)?;
+    check_game_rules(state);
+    Ok(())
+}
+
+fn check_game_rules(state: &mut ChessGui) {
+    state.gen_legal_moves_from_pos(state.board.turn);
+    let position_count = *state.repetition_map.entry(FenNotation::from(&state.board).to_draw_fen()).and_modify(|x| *x += 1).or_insert(1);
+    if state.board.half_move_timer_50 > 100 {
+        state.game_state = GameState::Done("Draw by the 50 move rule".into());
+    }
+    else if state.board.mating_material.0 < 3 && state.board.mating_material.1 < 3 {
+        state.game_state = GameState::Done("Draw by insufficitent mating material".into());
+    }
+    else if state.legal_moves.0.is_empty() {
+        if MoveRestrictionData::get(&state.board, state.board.turn).check_squares.checks_amount != 0 {
+            state.game_state = GameState::Done(format!("{} wins by checkmate", state.board.turn.opp().to_string()));
+        } else {
+            state.game_state = GameState::Done("Draw by stalemate".into());
+        }
+    }
+    else if position_count >= 3 {
+        state.game_state = GameState::Done("Draw by threefold repetition".into());
+    }
 }

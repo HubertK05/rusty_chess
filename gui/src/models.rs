@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::JoinHandle};
 
-use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}};
+use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}, move_register::models::ChessMove};
 use egui::{Ui, ColorImage, Vec2, Color32, Button};
 use egui_extras::RetainedImage;
 
@@ -72,6 +72,7 @@ pub struct ChessGui {
     pub repetition_map: HashMap<String, usize>,
     pub reversed: bool,
     pub assets: Assets,
+    pub bot_state: BotState,
 }
 
 impl ChessGui {
@@ -86,6 +87,10 @@ impl ChessGui {
             repetition_map: HashMap::from([(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()).to_draw_fen(), 1)]),
             reversed: false,
             assets,
+            bot_state: BotState {
+                thread: None,
+                timer: BotTimer::Idle,
+            },
         }
     }
 
@@ -97,6 +102,10 @@ impl ChessGui {
             repetition_map: HashMap::new(),
             reversed: false,
             assets,
+            bot_state: BotState {
+                thread: None,
+                timer: BotTimer::Idle,
+            },
         }
     }
 
@@ -159,9 +168,11 @@ impl eframe::App for ChessGui {
                 self.ui(ui);
             });
         });
+        ctx.request_repaint();
     }
 }
 
+#[derive(PartialEq)]
 pub enum GameState {
     Ongoing,
     Done(String),
@@ -194,6 +205,14 @@ impl GameState {
             }
         });
     }
+
+    pub fn is_ongoing(&self) -> bool {
+        *self == GameState::Ongoing
+    }
+
+    pub fn is_done(&self) -> bool {
+        *self != GameState::Ongoing
+    }
 }
 
 fn load_img(path: &str, name: &str) -> RetainedImage {
@@ -202,4 +221,15 @@ fn load_img(path: &str, name: &str) -> RetainedImage {
         [x.0[0], x.0[1], x.0[2], x.0[3]].into_iter()
     }).flatten().collect::<Vec<u8>>();
     RetainedImage::from_color_image(name, ColorImage::from_rgba_unmultiplied([60, 60], &pixels))
+}
+
+pub struct BotState {
+    pub thread: Option<JoinHandle<ChessMove>>,
+    pub timer: BotTimer,
+}
+
+#[derive(PartialEq)]
+pub enum BotTimer { 
+    Idle,
+    Pending,
 }
