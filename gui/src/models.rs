@@ -1,4 +1,6 @@
 use std::{collections::HashMap, thread::JoinHandle};
+use std::env;
+use std::path::PathBuf;
 
 use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}, move_register::models::ChessMove};
 use egui::{Ui, ColorImage, Vec2, Color32, Button};
@@ -31,19 +33,22 @@ pub struct Assets {
 
 impl Assets {
     pub fn new() -> Self {
+        let exe_path = env::current_exe().unwrap();
+        // let dir_path = exe_path.parent().unwrap().as_os_str().to_str().unwrap();
+        let dir_path = "src";
         Self {
-            wp: load_img("src/assets/wp.png", "white-pawn"),
-            bp: load_img("src/assets/bp.png", "black-pawn"),
-            wn: load_img("src/assets/wn.png", "white-knight"),
-            bn: load_img("src/assets/bn.png", "black-knight"),
-            wb: load_img("src/assets/wb.png", "white-bishop"),
-            bb: load_img("src/assets/bb.png", "black-bishop"),
-            wr: load_img("src/assets/wr.png", "white-rook"),
-            br: load_img("src/assets/br.png", "black-rook"),
-            wq: load_img("src/assets/wq.png", "white-queen"),
-            bq: load_img("src/assets/bq.png", "black-queen"),
-            wk: load_img("src/assets/wk.png", "white-king"),
-            bk: load_img("src/assets/bk.png", "black-king"),
+            wp: load_img(&(dir_path.to_string() + "/assets/wp.png"), "white-pawn"),
+            bp: load_img(&(dir_path.to_string() + "/assets/bp.png"), "black-pawn"),
+            wn: load_img(&(dir_path.to_string() + "/assets/wn.png"), "white-knight"),
+            bn: load_img(&(dir_path.to_string() + "/assets/bn.png"), "black-knight"),
+            wb: load_img(&(dir_path.to_string() + "/assets/wb.png"), "white-bishop"),
+            bb: load_img(&(dir_path.to_string() + "/assets/bb.png"), "black-bishop"),
+            wr: load_img(&(dir_path.to_string() + "/assets/wr.png"), "white-rook"),
+            br: load_img(&(dir_path.to_string() + "/assets/br.png"), "black-rook"),
+            wq: load_img(&(dir_path.to_string() + "/assets/wq.png"), "white-queen"),
+            bq: load_img(&(dir_path.to_string() + "/assets/bq.png"), "black-queen"),
+            wk: load_img(&(dir_path.to_string() + "/assets/wk.png"), "white-king"),
+            bk: load_img(&(dir_path.to_string() + "/assets/bk.png"), "black-king"),
         }
     }
 

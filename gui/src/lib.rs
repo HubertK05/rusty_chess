@@ -9,6 +9,10 @@ use egui::{
 };
 use models::{ChessGui, GameState, BotTimer, BotState};
 
+const LEGAL_MOVE_SQUARE_COLOR: Color32 = Color32::from_rgb(128, 0, 0);
+const BLACK_SQUARE_COLOR: Color32 = Color32::from_rgb(120, 64, 0);
+const WHITE_SQUARE_COLOR: Color32 = Color32::from_rgb(245, 235, 155);
+
 fn board_piece(ui: &mut Ui, id: Id, body: impl FnOnce(&mut Ui)) {
     let is_dragged = ui.memory(|mem| mem.is_being_dragged(id));
     if !is_dragged {
@@ -124,16 +128,16 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                             if let Some(destinations) = &legal_destinations {
                                 let Moves(filtered_moves) = destinations.search_with_to(Square(file as i8, rank as i8));
                                 if filtered_moves.len() != 0 && state.bot_state.timer == BotTimer::Idle {
-                                    Color32::from_rgb(128, 0, 0)
+                                    LEGAL_MOVE_SQUARE_COLOR
                                 } else if (file + rank) % 2 == 0 {
-                                    Color32::from_rgb(78, 44, 0)
+                                    BLACK_SQUARE_COLOR
                                 } else {
-                                    Color32::from_rgb(245, 235, 155)
+                                    WHITE_SQUARE_COLOR
                                 }
                             } else if (file + rank) % 2 == 0 {
-                                Color32::from_rgb(78, 44, 0)
+                                BLACK_SQUARE_COLOR
                             } else {
-                                Color32::from_rgb(245, 235, 155)
+                                WHITE_SQUARE_COLOR
                             }
                         };
 
