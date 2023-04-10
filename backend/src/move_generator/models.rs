@@ -1,5 +1,5 @@
 use crate::{
-    board_setup::models::{Board, BoardError, FenPieceType}, move_register::models::ChessMove,
+    board_setup::models::{Board, BoardError, FenPieceType}, move_register::models::{ChessMove, PromotedPieceType},
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -17,6 +17,17 @@ pub enum PieceType {
     Rook,
     Queen,
     King,
+}
+
+impl From<PromotedPieceType> for PieceType {
+    fn from(val: PromotedPieceType) -> Self {
+        match val {
+            PromotedPieceType::Queen => PieceType::Queen,
+            PromotedPieceType::Knight => PieceType::Knight,
+            PromotedPieceType::Bishop => PieceType::Bishop,
+            PromotedPieceType::Rook => PieceType::Rook,
+        }
+    }
 }
 
 impl From<PieceType> for char {
