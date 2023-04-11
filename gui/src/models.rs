@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::{collections::HashMap, thread::JoinHandle};
 use std::env;
 use std::path::PathBuf;
@@ -74,7 +75,7 @@ pub struct ChessGui {
     pub board: Board,
     pub legal_moves: Moves,
     pub game_state: GameState,
-    pub repetition_map: HashMap<String, usize>,
+    pub repetition_map: BTreeMap<u64, u8>,
     pub reversed: bool,
     pub assets: Assets,
     pub bot_state: BotState,
@@ -89,7 +90,7 @@ impl ChessGui {
             board,
             legal_moves,
             game_state: GameState::Ongoing,
-            repetition_map: HashMap::from([(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()).to_draw_fen(), 1)]),
+            repetition_map: BTreeMap::from([(board.hash_board(), 1)]),
             reversed: false,
             assets,
             bot_state: BotState {
@@ -104,7 +105,7 @@ impl ChessGui {
             board: Board::try_from(FenNotation("8/8/8/8/8/8/8/8 w - - 0 1".to_string())).unwrap(),
             legal_moves: Moves(Vec::new()),
             game_state: GameState::Ongoing,
-            repetition_map: HashMap::new(),
+            repetition_map: BTreeMap::new(),
             reversed: false,
             assets,
             bot_state: BotState {
@@ -118,7 +119,7 @@ impl ChessGui {
         self.board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
         self.legal_moves = Moves::get_all_moves(&self.board, Color::White);
         self.game_state = GameState::Ongoing;
-        self.repetition_map = HashMap::from([(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()).to_draw_fen(), 1)]);
+        self.repetition_map = BTreeMap::from([(self.board.hash_board(), 1)]);
     }
 
     pub fn reverse_view(&mut self) {

@@ -161,8 +161,9 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
 
                     if state.game_state.is_ongoing() {
                         let board = state.board;
+                        let rep_map = state.repetition_map.clone();
                         let chosen_move = std::thread::spawn(move || {
-                            choose_move(&board).expect("oops, failed to choose a move")
+                            choose_move(&board, rep_map).expect("oops, failed to choose a move")
                         });
                         state.bot_state = BotState {
                             thread: Some(chosen_move),
@@ -195,7 +196,7 @@ fn play_move(state: &mut ChessGui, chosen_move: ChessMove) -> Result<(), MoveErr
 
 fn check_game_rules(state: &mut ChessGui) {
     state.gen_legal_moves_from_pos(state.board.turn);
-    let position_count = *state.repetition_map.entry(FenNotation::from(&state.board).to_draw_fen()).and_modify(|x| *x += 1).or_insert(1);
+    let position_count = *state.repetition_map.entry(state.board.hash_board()).and_modify(|x| *x += 1).or_insert(1);
     if state.board.half_move_timer_50 > 100 {
         state.game_state = GameState::Done("Draw by the 50 move rule".into());
     }
