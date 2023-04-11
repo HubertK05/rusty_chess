@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
-use std::{collections::HashMap, thread::JoinHandle};
+use std::thread::JoinHandle;
 use std::env;
-use std::path::PathBuf;
 
 use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}, move_register::models::ChessMove};
 use egui::{Ui, ColorImage, Vec2, Color32, Button};
@@ -78,7 +77,8 @@ pub struct ChessGui {
     pub repetition_map: BTreeMap<u64, u8>,
     pub reversed: bool,
     pub assets: Assets,
-    pub bot_state: BotState,
+    pub bot_thread: Option<JoinHandle<ChessMove>>,
+    pub bot_settings: (bool, bool)
 }
 
 impl ChessGui {
@@ -93,10 +93,8 @@ impl ChessGui {
             repetition_map: BTreeMap::from([(board.hash_board(), 1)]),
             reversed: false,
             assets,
-            bot_state: BotState {
-                thread: None,
-                timer: BotTimer::Idle,
-            },
+            bot_thread: None,
+            bot_settings: (false, false)
         }
     }
 
@@ -108,14 +106,13 @@ impl ChessGui {
             repetition_map: BTreeMap::new(),
             reversed: false,
             assets,
-            bot_state: BotState {
-                thread: None,
-                timer: BotTimer::Idle,
-            },
+            bot_thread: None,
+            bot_settings: (false, false)
         }
     }
 
     pub fn reset_game(&mut self) {
+        self.bot_thread = None;
         self.board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
         self.legal_moves = Moves::get_all_moves(&self.board, Color::White);
         self.game_state = GameState::Ongoing;
@@ -148,13 +145,29 @@ impl ChessGui {
                 ui.vertical(|ui| {
                     ui.allocate_ui(Vec2::new(200., 600.), |ui| {
                         ui.add_space(73.5);
-                        if ui.add_sized(Vec2::new(200., 148.), Button::new("Reset game")).clicked() {
+                        if ui.add_sized(Vec2::new(200., 72.5), Button::new("Reset game")).clicked() {
                             self.reset_game();
                         }
-                        self.game_state.show(ui, self.board.turn);
-                        if ui.add_sized(Vec2::new(200., 148.), Button::new("Reverse view")).clicked() {
+                        if ui.add_sized(Vec2::new(200., 72.5), Button::new("Reverse view")).clicked() {
                             self.reverse_view();
                         }
+                        self.game_state.show(ui, self.board.turn);
+                        let button_text_bot_white = if self.bot_settings.0 {
+                            "Toggle bot for White (on)"
+                        } else {
+                            "Toggle bot for White (off)"
+                        };
+                        let button_text_bot_black = if self.bot_settings.1 {
+                            "Toggle bot for Black (on)"
+                        } else {
+                            "Toggle bot for Black (off)"
+                        };
+                        if ui.add_sized(Vec2::new(200., 72.5), Button::new(button_text_bot_white)).clicked() {
+                            self.bot_settings.0 = !self.bot_settings.0;
+                        };
+                        if ui.add_sized(Vec2::new(200., 72.5), Button::new(button_text_bot_black)).clicked() {
+                            self.bot_settings.1 = !self.bot_settings.1;
+                        };
                         ui.add_space(73.5);
                     });
                 });
@@ -162,6 +175,13 @@ impl ChessGui {
             });
         });
         paint_max_rect(ui, bg, Color32::from_rgb(32, 20, 0));
+    }
+
+    pub fn get_bot_settings(&self, color: Color) -> bool {
+        match color {
+            Color::White => self.bot_settings.0,
+            Color::Black => self.bot_settings.1,
+        }
     }
 }
 
@@ -200,7 +220,7 @@ impl GameState {
                                 ui.label("Black's turn");
                                 paint_max_rect(ui, bg, Color32::BLACK)
                             },
-                        }
+                        };
                     });
                 },
                 GameState::Done(msg) => {
@@ -227,15 +247,4 @@ fn load_img(path: &str, name: &str) -> RetainedImage {
         [x.0[0], x.0[1], x.0[2], x.0[3]].into_iter()
     }).flatten().collect::<Vec<u8>>();
     RetainedImage::from_color_image(name, ColorImage::from_rgba_unmultiplied([60, 60], &pixels))
-}
-
-pub struct BotState {
-    pub thread: Option<JoinHandle<ChessMove>>,
-    pub timer: BotTimer,
-}
-
-#[derive(PartialEq)]
-pub enum BotTimer { 
-    Idle,
-    Pending,
 }

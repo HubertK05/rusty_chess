@@ -2,12 +2,12 @@ pub mod models;
 pub mod additions;
 
 use additions::{new_bg, paint_max_rect};
-use backend::{board_setup::models::FenNotation, move_generator::models::{Moves, Square, MoveRestrictionData, ChessPiece}, chess_bot::choose_move, move_register::models::{ChessMove, MoveError}};
+use backend::{move_generator::models::{Moves, Square, MoveRestrictionData, ChessPiece}, chess_bot::choose_move, move_register::models::{ChessMove, MoveError}};
 use eframe::epaint::RectShape;
 use egui::{
     Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape, Ui, Vec2, layers::ShapeIdx,
 };
-use models::{ChessGui, GameState, BotTimer, BotState};
+use models::{ChessGui, GameState};
 
 const LEGAL_MOVE_SQUARE_COLOR: Color32 = Color32::from_rgb(128, 0, 0);
 const BLACK_SQUARE_COLOR: Color32 = Color32::from_rgb(120, 64, 0);
@@ -127,7 +127,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                         let color = {
                             if let Some(destinations) = &legal_destinations {
                                 let Moves(filtered_moves) = destinations.search_with_to(Square(file as i8, rank as i8));
-                                if filtered_moves.len() != 0 && state.bot_state.timer == BotTimer::Idle {
+                                if filtered_moves.len() != 0 && state.bot_thread.is_none() && !state.get_bot_settings(state.board.turn) {
                                     LEGAL_MOVE_SQUARE_COLOR
                                 } else if (file + rank) % 2 == 0 {
                                     BLACK_SQUARE_COLOR
@@ -153,36 +153,36 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
         });
     });
 
-    if state.game_state.is_ongoing() && state.bot_state.timer == BotTimer::Idle {
+    if state.game_state.is_ongoing() && state.bot_thread.is_none() && !state.get_bot_settings(state.board.turn) {
         if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
             if ui.input(|i| i.pointer.any_released()) {
                 if let Some(chosen_move) = state.legal_moves.find(Square(drag_file as i8, drag_rank as i8), Square(drop_file as i8, drop_rank as i8)) {
                     play_move(state, chosen_move).expect("oops, couldn't play the move");
-
-                    if state.game_state.is_ongoing() {
-                        let board = state.board;
-                        let rep_map = state.repetition_map.clone();
-                        let chosen_move = std::thread::spawn(move || {
-                            choose_move(&board, rep_map).expect("oops, failed to choose a move")
-                        });
-                        state.bot_state = BotState {
-                            thread: Some(chosen_move),
-                            timer: BotTimer::Pending,
-                        };
-                    }
                 }
             }
         }
     }
 
-    let thread = state.bot_state.thread.take();
+    if state.game_state.is_ongoing() && state.get_bot_settings(state.board.turn) && state.bot_thread.is_none() {
+        let board = state.board;
+        let rep_map = state.repetition_map.clone();
+        let chosen_move = std::thread::spawn(move || {
+            choose_move(&board, rep_map).expect("oops, failed to choose a move")
+        });
+        state.bot_thread = Some(chosen_move);
+    }
+
+    if !state.get_bot_settings(state.board.turn) && state.bot_thread.is_some() {
+        state.bot_thread.take();
+    }
+
+    let thread = state.bot_thread.take();
     if let Some(th) = thread {
         if th.is_finished() {
             let chosen_move = th.join().unwrap();
             play_move(state, chosen_move).expect("oops, couldn't play the move");
-            state.bot_state.timer = BotTimer::Idle;
         } else {
-            state.bot_state.thread = Some(th)
+            state.bot_thread = Some(th)
         }
     }
     paint_max_rect(ui, bg, Color32::from_rgb(128, 88, 19))
