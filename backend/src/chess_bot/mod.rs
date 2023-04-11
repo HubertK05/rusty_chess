@@ -1,7 +1,10 @@
 pub mod piece_tables;
+pub mod zobrist;
+pub mod bitmasks;
+
 use std::cmp::Ordering;
 use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::Board, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece}, restrictions::get_checked}};
-use self::piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE};
+use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move};
 
 const PRUNING: bool = true;
 const POSITIONAL_VALUE: bool = true;
@@ -24,7 +27,9 @@ pub fn choose_move(board: &Board) -> Option<ChessMove> {
         Color::Black => i16::MIN,
     };
 
-    let res = search_game_tree(board, 0, SEARCH_DEPTH, limit);
+    let hash = board.hash_board();
+
+    let res = search_game_tree(board, 0, SEARCH_DEPTH, limit, hash);
     println!("eval: {}\nthe number of positions tested: {}", res.1, res.2);
     res.0
 }
@@ -92,7 +97,7 @@ fn new_best_move(best_move: Option<ChessMove>, best_eval: i16, curr_move: ChessM
     }
 }
 
-fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i16) -> (Option<ChessMove>, i16, u64) {
+fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i16, hash: u64) -> (Option<ChessMove>, i16, u64) {
     let is_endgame = is_endgame(board);
     let base_eval = evaluate_position(board, is_endgame);
     let move_iter = move_set.into_iter();
@@ -106,6 +111,8 @@ fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i1
 
     for test_move in move_iter {
         let chg = evaluate_chg(board, test_move, is_endgame);
+        let new_hash = hash_with_move(hash, board, test_move);
+
         let res = base_eval + chg;
         (best_move, best_eval) = new_best_move(best_move, best_eval, test_move, res, board.turn);
 
@@ -129,7 +136,7 @@ fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i1
     (best_move, best_eval, position_num)
 }
 
-fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Option<ChessMove>, i16, u64) {
+fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16, hash: u64) -> (Option<ChessMove>, i16, u64) {
     let move_set = get_ordered_moves(board);
     if move_set.len() == 0 {
         if is_in_check(board) {
@@ -144,7 +151,7 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Opt
     }
 
     if depth == max_depth - 1 {
-        return search_game_tree_base_case(move_set, board, limit)
+        return search_game_tree_base_case(move_set, board, limit, hash)
     };
 
     let mut best_move: Option<ChessMove> = None;
@@ -157,9 +164,10 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Opt
 
     for test_move in move_set.into_iter() {
         let mut new_board = *board;
+        let new_hash = hash_with_move(hash, board, test_move);
         (&mut new_board).register_move(test_move).expect("oops, failed to register move during game search");
 
-        let (_, res, lower_pos_num) = search_game_tree(&new_board, depth + 1, max_depth, best_eval);
+        let (_, res, lower_pos_num) = search_game_tree(&new_board, depth + 1, max_depth, best_eval, new_hash);
         
         (best_move, best_eval) = new_best_move(best_move, best_eval, test_move, res, board.turn);
 

@@ -6,7 +6,7 @@ use crate::{
     },
     move_register::{
         models::{MoveError, MoveType, ChessMove},
-    },
+    }, chess_bot::zobrist::zobrist_hash,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -219,6 +219,10 @@ impl Board {
         }
 
         Ok(())
+    }
+
+    pub fn hash_board(&self) -> u64 {
+        zobrist_hash(self)
     }
 }
 
