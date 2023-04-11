@@ -6,7 +6,17 @@ use self::piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUE
 const PRUNING: bool = true;
 const POSITIONAL_VALUE: bool = true;
 const MATERIAL_VALUE: bool = true;
-const SEARCH_DEPTH: u8 = 4;
+const SEARCH_DEPTH: u8 = 6;
+
+const MVV_LVA_TABLE: [[u8; 6]; 6] = [
+    //K   Q   R   B   N   P
+    [ 0,  0,  0,  0,  0,  0], // K
+    [12, 15, 12, 11, 11, 10], // Q
+    [13, 20, 15, 13, 13, 12], // R
+    [14, 26, 25, 15, 14, 13], // B
+    [14, 32, 31, 30, 15, 13], // N
+    [39, 38, 37, 36, 35, 15], // P
+];
 
 pub fn choose_move(board: &Board) -> Option<ChessMove> {
     let limit = match board.turn {
@@ -15,7 +25,7 @@ pub fn choose_move(board: &Board) -> Option<ChessMove> {
     };
 
     let res = search_game_tree(board, 0, SEARCH_DEPTH, limit);
-    println!("{}", res.1);
+    println!("eval: {}\nthe number of positions tested: {}", res.1, res.2);
     res.0
 }
 
@@ -41,10 +51,30 @@ fn get_ordered_moves(board: &Board) -> Vec<ChessMove> {
     let Moves(mut move_set) = Moves::get_all_moves(&board, board.turn);
     move_set.sort_by_key(|mov| {
         match mov.move_type {
-            MoveType::Move(_) => 4,
-            MoveType::Capture(_) => 2,
-            MoveType::EnPassantMove => 3,
-            MoveType::CastleMove(_) => 4,
+            MoveType::Move(_) => 101,
+            MoveType::Capture(attacker) => {
+                let victim = board.get_square(mov.to).expect("no piece found where it should be").piece_type;
+                let victim_idx = match victim {
+                    PieceType::Pawn => 5,
+                    PieceType::Knight => 4,
+                    PieceType::Bishop => 3,
+                    PieceType::Rook => 2,
+                    PieceType::Queen => 1,
+                    PieceType::King => 0,
+                };
+                let attacker_idx = match attacker {
+                    PieceType::Pawn => 5,
+                    PieceType::Knight => 4,
+                    PieceType::Bishop => 3,
+                    PieceType::Rook => 2,
+                    PieceType::Queen => 1,
+                    PieceType::King => 0,
+                };
+
+                MVV_LVA_TABLE[victim_idx][attacker_idx]
+            },
+            MoveType::EnPassantMove => 100,
+            MoveType::CastleMove(_) => 101,
             MoveType::PromotionMove(_) => 1,
             MoveType::PromotionCapture(_) => 0,
         }
@@ -62,10 +92,11 @@ fn new_best_move(best_move: Option<ChessMove>, best_eval: i16, curr_move: ChessM
     }
 }
 
-fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i16) -> (Option<ChessMove>, i16) {
+fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i16) -> (Option<ChessMove>, i16, u64) {
     let is_endgame = is_endgame(board);
     let base_eval = evaluate_position(board, is_endgame);
     let move_iter = move_set.into_iter();
+    let mut position_num = 0;
 
     let mut best_move: Option<ChessMove> = None;
     let mut best_eval = match board.turn {
@@ -78,29 +109,27 @@ fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i1
         let res = base_eval + chg;
         (best_move, best_eval) = new_best_move(best_move, best_eval, test_move, res, board.turn);
 
+        position_num += 1;
+
         if PRUNING {
             match board.turn {
-                Color::White => if res > limit {
-                    return (None, i16::MAX);
+                Color::White => if res >= limit {
+                    return (None, i16::MAX, position_num);
                 },
                 Color::Black => if res <= limit {
-                    return (None, i16::MIN);
+                    return (None, i16::MIN, position_num);
                 },
             };
         }
 
         let mut new_board = *board;
         let _ = (&mut new_board).register_move(test_move);
-        // match board.turn {
-        //     Color::White => println!("the board\n{new_board}is evaluated to {res}"),
-        //     Color::Black => println!("the board\n{new_board}is evaluated to {res}"),
-        // }
     };
 
-    (best_move, best_eval)
+    (best_move, best_eval, position_num)
 }
 
-fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Option<ChessMove>, i16) {
+fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Option<ChessMove>, i16, u64) {
     let move_set = get_ordered_moves(board);
     if move_set.len() == 0 {
         if is_in_check(board) {
@@ -108,9 +137,9 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Opt
                 Color::White => -25000 + depth as i16,
                 Color::Black => 25000 - depth as i16,
             };
-            return (None, eval)
+            return (None, eval, 1)
         } else {
-            return (None, 0)
+            return (None, 0, 1)
         }
     }
 
@@ -124,11 +153,13 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Opt
         Color::Black => i16::MAX,
     };
 
+    let mut position_num = 0;
+
     for test_move in move_set.into_iter() {
         let mut new_board = *board;
         (&mut new_board).register_move(test_move).expect("oops, failed to register move during game search");
 
-        let (_, res) = search_game_tree(&new_board, depth + 1, max_depth, best_eval);
+        let (_, res, lower_pos_num) = search_game_tree(&new_board, depth + 1, max_depth, best_eval);
         
         (best_move, best_eval) = new_best_move(best_move, best_eval, test_move, res, board.turn);
 
@@ -139,19 +170,21 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16) -> (Opt
             }
         }
 
+        position_num += lower_pos_num;
+
         if PRUNING {
             match board.turn {
-                Color::White => if res > limit {
-                    return (None, i16::MAX);
+                Color::White => if res >= limit {
+                    return (None, i16::MAX, position_num);
                 },
-                Color::Black => if res < limit {
-                    return (None, i16::MIN);
+                Color::Black => if res <= limit {
+                    return (None, i16::MIN, position_num);
                 },
             };
         }
     };
 
-    (best_move, best_eval)
+    (best_move, best_eval, position_num)
 }
 
 fn evaluate_position(board: &Board, is_endgame: bool) -> i16 {
