@@ -39,6 +39,9 @@ fn is_in_check(board: &Board) -> bool {
 }
 
 fn is_endgame(board: &Board) -> bool {
+    if board.mating_material.0 <= 12 && board.mating_material.1 <= 12 {
+        return true
+    };
     for rank in 0..8 {
         for file in 0..8 {
             let piece = board.get_square(Square(file, rank));
@@ -114,14 +117,12 @@ fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i1
         let new_hash = hash_with_move(hash, board, test_move);
 
         let rep_num = *rep_map.entry(new_hash).and_modify(|x| *x += 1).or_insert(1);
-        // println!("before: {rep_num}");
         let res = if rep_num >= 3 {
             0
         } else {
             base_eval + chg
         };
-        let new_rep_num = *rep_map.entry(new_hash).and_modify(|x| *x -= 1).or_insert(1);
-        // println!("after: {new_rep_num}");
+        rep_map.entry(new_hash).and_modify(|x| *x -= 1).or_insert(1);
 
         (best_move, best_eval) = new_best_move(best_move, best_eval, test_move, res, board.turn);
 
@@ -150,8 +151,8 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16, hash: u
     if move_set.len() == 0 {
         if is_in_check(board) {
             let eval = match board.turn {
-                Color::White => -25000 + depth as i16,
-                Color::Black => 25000 - depth as i16,
+                Color::White => -25000 + depth as i16 * 100,
+                Color::Black => 25000 - depth as i16 * 100,
             };
             return (None, eval, 1)
         } else {
@@ -182,7 +183,17 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16, hash: u
             (0, 1)
         } else {
             let res = search_game_tree(&new_board, depth + 1, max_depth, best_eval, new_hash, rep_map);
-            (res.1, res.2)
+            let king_dist_chg = if is_endgame(board) && depth == 0 && res.1 != i16::MIN && res.1 != i16::MAX {
+                let new_offset = new_board.king_positions.0 - new_board.king_positions.1;
+                match board.turn {
+                    Color::White => -(new_offset.0.abs() + new_offset.1.abs()) * 2,
+                    Color::Black => (new_offset.0.abs() + new_offset.1.abs()) * 2,
+                }
+            } else {
+                0
+            } as i16;
+        
+            (res.1 + king_dist_chg, res.2)
         };
         rep_map.entry(new_hash).and_modify(|x| *x -= 1);
 
@@ -227,7 +238,7 @@ fn evaluate_position(board: &Board, is_endgame: bool) -> i16 {
 }
 
 fn evaluate_chg(board: &Board, mov: ChessMove, is_endgame: bool) -> i16 {
-    let from = board.get_square(mov.from).expect("no piece found where it should be");    
+    let from = board.get_square(mov.from).expect("no piece found where it should be");
 
     piece_value_chg(from, mov, is_endgame) + match mov.move_type {
         MoveType::Move(_) => 0,
