@@ -8,6 +8,8 @@ use egui_extras::RetainedImage;
 
 use crate::{additions::{new_bg, paint_max_rect}, chess_ui};
 
+const FOR_EXTERNAL_USE: bool = true;
+
 pub struct Square(pub usize, pub usize);
 
 impl ToString for Square {
@@ -33,22 +35,26 @@ pub struct Assets {
 
 impl Assets {
     pub fn new() -> Self {
-        let exe_path = env::current_exe().unwrap();
-        // let dir_path = exe_path.parent().unwrap().as_os_str().to_str().unwrap();
-        let dir_path = "src";
+        let dir_path = if FOR_EXTERNAL_USE {
+            let exe_path = env::current_exe().unwrap();
+            exe_path.parent().unwrap().as_os_str().to_str().unwrap().to_string()
+        } else {
+            "src".to_string()
+        };
+
         Self {
-            wp: load_img(&(dir_path.to_string() + "/assets/wp.png"), "white-pawn"),
-            bp: load_img(&(dir_path.to_string() + "/assets/bp.png"), "black-pawn"),
-            wn: load_img(&(dir_path.to_string() + "/assets/wn.png"), "white-knight"),
-            bn: load_img(&(dir_path.to_string() + "/assets/bn.png"), "black-knight"),
-            wb: load_img(&(dir_path.to_string() + "/assets/wb.png"), "white-bishop"),
-            bb: load_img(&(dir_path.to_string() + "/assets/bb.png"), "black-bishop"),
-            wr: load_img(&(dir_path.to_string() + "/assets/wr.png"), "white-rook"),
-            br: load_img(&(dir_path.to_string() + "/assets/br.png"), "black-rook"),
-            wq: load_img(&(dir_path.to_string() + "/assets/wq.png"), "white-queen"),
-            bq: load_img(&(dir_path.to_string() + "/assets/bq.png"), "black-queen"),
-            wk: load_img(&(dir_path.to_string() + "/assets/wk.png"), "white-king"),
-            bk: load_img(&(dir_path.to_string() + "/assets/bk.png"), "black-king"),
+            wp: load_img(&(dir_path.clone() + "/assets/wp.png"), "white-pawn"),
+            bp: load_img(&(dir_path.clone() + "/assets/bp.png"), "black-pawn"),
+            wn: load_img(&(dir_path.clone() + "/assets/wn.png"), "white-knight"),
+            bn: load_img(&(dir_path.clone() + "/assets/bn.png"), "black-knight"),
+            wb: load_img(&(dir_path.clone() + "/assets/wb.png"), "white-bishop"),
+            bb: load_img(&(dir_path.clone() + "/assets/bb.png"), "black-bishop"),
+            wr: load_img(&(dir_path.clone() + "/assets/wr.png"), "white-rook"),
+            br: load_img(&(dir_path.clone() + "/assets/br.png"), "black-rook"),
+            wq: load_img(&(dir_path.clone() + "/assets/wq.png"), "white-queen"),
+            bq: load_img(&(dir_path.clone() + "/assets/bq.png"), "black-queen"),
+            wk: load_img(&(dir_path.clone() + "/assets/wk.png"), "white-king"),
+            bk: load_img(&(dir_path.clone() + "/assets/bk.png"), "black-king"),
         }
     }
 

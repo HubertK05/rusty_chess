@@ -2,7 +2,7 @@ pub mod piece_tables;
 pub mod zobrist;
 pub mod bitmasks;
 
-use std::{cmp::Ordering, collections::{HashMap, BTreeMap}};
+use std::{cmp::Ordering, collections::BTreeMap};
 use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::Board, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece}, restrictions::get_checked}};
 use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move};
 
