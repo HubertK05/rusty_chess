@@ -8,7 +8,7 @@ use egui_extras::RetainedImage;
 
 use crate::{additions::{new_bg, paint_max_rect}, chess_ui};
 
-const FOR_EXTERNAL_USE: bool = true;
+const FOR_EXTERNAL_USE: bool = false;
 
 pub struct Square(pub usize, pub usize);
 

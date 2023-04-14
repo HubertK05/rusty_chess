@@ -3,7 +3,7 @@ pub mod zobrist;
 pub mod bitmasks;
 
 use std::{cmp::Ordering, collections::BTreeMap};
-use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::Board, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece}, restrictions::get_checked}};
+use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::Board, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece, Offset}, restrictions::get_checked}};
 use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move};
 
 const PRUNING: bool = true;
@@ -11,7 +11,7 @@ const POSITIONAL_VALUE: bool = true;
 const MATERIAL_VALUE: bool = true;
 const SEARCH_DEPTH: u8 = 6;
 
-const MVV_LVA_TABLE: [[u8; 6]; 6] = [
+const MVV_LVA_TABLE: [[i16; 6]; 6] = [
     //K   Q   R   B   N   P
     [ 0,  0,  0,  0,  0,  0], // K
     [12, 15, 12, 11, 11, 10], // Q
@@ -59,7 +59,18 @@ fn get_ordered_moves(board: &Board) -> Vec<ChessMove> {
     let Moves(mut move_set) = Moves::get_all_moves(&board, board.turn);
     move_set.sort_by_key(|mov| {
         match mov.move_type {
-            MoveType::Move(_) => 101,
+            MoveType::Move(pt) => {
+                let positional_chg = match board.turn {
+                    Color::White => -evaluate_chg(board, *mov, is_endgame(board)),
+                    Color::Black => evaluate_chg(board, *mov, is_endgame(board)),
+                };
+
+                if is_attacked_by_pawn(board, mov.to) && pt != PieceType::Pawn {
+                    251 + positional_chg
+                } else {
+                    151 + positional_chg
+                }
+            },
             MoveType::Capture(attacker) => {
                 let victim = board.get_square(mov.to).expect("no piece found where it should be").piece_type;
                 let victim_idx = match victim {
@@ -329,6 +340,29 @@ fn positional_value(piece: ChessPiece, is_endgame: bool) -> i16 {
     };
     // println!("{:?} {}", piece, res);
     res
+}
+
+fn is_attacked_by_pawn(board: &Board, sq: Square) -> bool {
+    match board.turn {
+        Color::White => {
+            if let Some(ChessPiece { piece_type: PieceType::Pawn, color: Color::Black, .. }) = board.get_square(sq + Offset(-1, 1)) {
+                true
+            } else if let Some(ChessPiece { piece_type: PieceType::Pawn, color: Color::Black, .. }) = board.get_square(sq + Offset(1, 1)) {
+                true
+            } else {
+                false
+            }
+        },
+        Color::Black => {
+            if let Some(ChessPiece { piece_type: PieceType::Pawn, color: Color::White, .. }) = board.get_square(sq + Offset(-1, -1)) {
+                true
+            } else if let Some(ChessPiece { piece_type: PieceType::Pawn, color: Color::White, .. }) = board.get_square(sq + Offset(1, -1)) {
+                true
+            } else {
+                false
+            }
+        } 
+    }
 }
 
 #[cfg(test)] 
