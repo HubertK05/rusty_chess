@@ -1,17 +1,18 @@
 pub mod piece_tables;
 pub mod zobrist;
 pub mod bitmasks;
+pub mod pawn_structure;
 
 use std::{cmp::Ordering, collections::BTreeMap};
 use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::Board, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece, Offset}, restrictions::get_checked}};
-use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move};
+use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move, pawn_structure::get_pawn_weaknesses_from_board};
 
 const PRUNING: bool = true;
 const POSITIONAL_VALUE: bool = true;
 const MATERIAL_VALUE: bool = true;
 const SEARCH_DEPTH: u8 = 6;
 
-const MVV_LVA_TABLE: [[i16; 6]; 6] = [
+pub const MVV_LVA_TABLE: [[i16; 6]; 6] = [
     //K   Q   R   B   N   P
     [ 0,  0,  0,  0,  0,  0], // K
     [12, 15, 12, 11, 11, 10], // Q
@@ -38,7 +39,7 @@ fn is_in_check(board: &Board) -> bool {
     get_checked(board, board.turn).checks_amount != 0
 }
 
-fn is_endgame(board: &Board) -> bool {
+pub fn is_endgame(board: &Board) -> bool {
     if board.mating_material.0 <= 12 && board.mating_material.1 <= 12 {
         return true
     };
@@ -55,9 +56,9 @@ fn is_endgame(board: &Board) -> bool {
     return true
 }
 
-fn get_ordered_moves(board: &Board) -> Vec<ChessMove> {
+pub fn get_ordered_moves(board: &Board) -> Vec<ChessMove> {
     let Moves(mut move_set) = Moves::get_all_moves(&board, board.turn);
-    move_set.sort_by_key(|mov| {
+    move_set.sort_by_cached_key(|mov| {
         match mov.move_type {
             MoveType::Move(pt) => {
                 let positional_chg = match board.turn {
@@ -66,9 +67,9 @@ fn get_ordered_moves(board: &Board) -> Vec<ChessMove> {
                 };
 
                 if is_attacked_by_pawn(board, mov.to) && pt != PieceType::Pawn {
-                    251 + positional_chg
+                    2000 + positional_chg
                 } else {
-                    151 + positional_chg
+                    1000 + positional_chg
                 }
             },
             MoveType::Capture(attacker) => {
@@ -111,7 +112,7 @@ fn new_best_move(best_move: Option<ChessMove>, best_eval: i16, curr_move: ChessM
     }
 }
 
-fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i16, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, i16, u64) {
+pub fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i16, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, i16, u64) {
     let is_endgame = is_endgame(board);
     let base_eval = evaluate_position(board, is_endgame);
     let move_iter = move_set.into_iter();
@@ -149,15 +150,12 @@ fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i1
                 },
             };
         }
-
-        let mut new_board = *board;
-        let _ = (&mut new_board).register_move(test_move);
     };
 
     (best_move, best_eval, position_num)
 }
 
-fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, i16, u64) {
+pub fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, i16, u64) {
     let move_set = get_ordered_moves(board);
     if move_set.len() == 0 {
         if is_in_check(board) {
@@ -172,7 +170,7 @@ fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i16, hash: u
     }
 
     if depth == max_depth - 1 {
-        return search_game_tree_base_case(move_set, board, limit, hash, rep_map)
+        return search_game_tree_base_case(move_set, board, limit, hash, rep_map);
     };
 
     let mut best_move: Option<ChessMove> = None;
@@ -244,13 +242,18 @@ fn evaluate_position(board: &Board, is_endgame: bool) -> i16 {
             }
         }
     }
+    let pawn_weaknesses = get_pawn_weaknesses_from_board(board);
+    let pawn_weakness_score = 50 * ((pawn_weaknesses.0 + pawn_weaknesses.2) as i16 - (pawn_weaknesses.1 + pawn_weaknesses.3) as i16);
 
-    res
+    match board.turn {
+        Color::White => res - pawn_weakness_score,
+        Color::Black => res + pawn_weakness_score,
+    }
 }
 
-fn evaluate_chg(board: &Board, mov: ChessMove, is_endgame: bool) -> i16 {
+pub fn evaluate_chg(board: &Board, mov: ChessMove, is_endgame: bool) -> i16 {
     let from = board.get_square(mov.from).expect("no piece found where it should be");
-
+    
     piece_value_chg(from, mov, is_endgame) + match mov.move_type {
         MoveType::Move(_) => 0,
         MoveType::Capture(_) => {
@@ -342,7 +345,7 @@ fn positional_value(piece: ChessPiece, is_endgame: bool) -> i16 {
     res
 }
 
-fn is_attacked_by_pawn(board: &Board, sq: Square) -> bool {
+pub fn is_attacked_by_pawn(board: &Board, sq: Square) -> bool {
     match board.turn {
         Color::White => {
             if let Some(ChessPiece { piece_type: PieceType::Pawn, color: Color::Black, .. }) = board.get_square(sq + Offset(-1, 1)) {

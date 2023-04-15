@@ -1,39 +1,50 @@
+use std::collections::BTreeMap;
+
 use backend::{
-    board_setup::models::{Board, FenNotation}, move_generator::{models::{Moves, Color, PieceType, Square, ChessPiece, MoveRestrictionData}, restrictions::{get_attacked, get_checked, get_pins}}, move_register::models::{MoveType, ChessMove},
+    board_setup::models::{Board, FenNotation}, move_generator::{models::{Moves, Color, PieceType, Square}}, move_register::models::{MoveType, ChessMove}, chess_bot::{search_game_tree, search_game_tree_base_case, get_ordered_moves, evaluate_chg, is_endgame, is_attacked_by_pawn},
 };
 use easybench::bench;
 
 fn main() {
     let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
     // let board = Board::try_from(FenNotation("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1".into())).unwrap();
+    let mut rep_map = BTreeMap::new();
+    let Moves(moves) = Moves::get_all_moves(&board, board.turn);
+    let test_move = ChessMove { move_type: MoveType::Move(PieceType::Pawn), from: Square(4, 1), to: Square(4, 3) };
 
-    let mut a = Vec::new();
-    println!("push a chess move - {}", bench(|| a.push(ChessMove { move_type: MoveType::Move(PieceType::Pawn), from: Square(4, 1), to: Square(4, 2) })));
+    println!("eval chg - {}", bench(|| evaluate_chg(&board, test_move, is_endgame(&board))));
+    println!("score move - {}", bench(|| {
+        let mov = &test_move;
 
-    println!("attacked - {}", bench(|| get_attacked(&board, Color::White)));
-    println!("checked - {}", bench(|| get_checked(&board, Color::White)));
-    println!("pins - {}", bench(|| get_pins(&board, Color::White)));
-    let restrictions = MoveRestrictionData::get(&board, Color::White);
+        let positional_chg = match board.turn {
+            Color::White => -evaluate_chg(&board, *mov, is_endgame(&board)),
+            Color::Black => evaluate_chg(&board, *mov, is_endgame(&board)),
+        };
+    
+        if is_attacked_by_pawn(&board, test_move.to) {
+            2000 + positional_chg
+        } else {
+            1000 + positional_chg
+        }
+    }));
+    println!("score and order moves - {}", bench(|| {
+        let mut move_set = moves.clone();
+        move_set.sort_by_cached_key(|mov| {
+            let positional_chg = match board.turn {
+                Color::White => -evaluate_chg(&board, *mov, is_endgame(&board)),
+                Color::Black => evaluate_chg(&board, *mov, is_endgame(&board)),
+            };
 
-    println!("all restrictions - {}", bench(|| MoveRestrictionData::get(&board, Color::White)));
-
-    let pawn = ChessPiece { piece_type: PieceType::Pawn, position: Square(4, 1), color: Color::White};
-    println!("all pawn moves (x8) - {}", bench(|| pawn.get_moves(&board, &restrictions)));
-
-    let knight = ChessPiece { piece_type: PieceType::Knight, position: Square(1, 0), color: Color::White};
-    println!("knight moves (x2) - {}", bench(|| knight.get_moves(&board, &restrictions)));
-
-    let bishop = ChessPiece { piece_type: PieceType::Bishop, position: Square(2, 0), color: Color::White};
-    println!("bishop moves (x2) - {}", bench(|| bishop.get_moves(&board, &restrictions)));
-
-    let rook = ChessPiece { piece_type: PieceType::Rook, position: Square(0, 0), color: Color::White};
-    println!("rook moves (x2) - {}", bench(|| rook.get_moves(&board, &restrictions)));
-
-    let queen = ChessPiece { piece_type: PieceType::Queen, position: Square(3, 0), color: Color::White};
-    println!("queen moves - {}", bench(|| queen.get_moves(&board, &restrictions)));
-
-    let king = ChessPiece { piece_type: PieceType::King, position: Square(4, 0), color: Color::White};
-    println!("king moves - {}", bench(|| king.get_moves(&board, &restrictions)));  
-
-    println!("sum - {}", bench(|| Moves::get_all_moves(&board, Color::White)));
+            if is_attacked_by_pawn(&board, mov.to) {
+                2000 + positional_chg
+            } else {
+                1000 + positional_chg
+            }
+        });
+        move_set
+    }));
+    println!("search to depth 2 - {}", bench(|| search_game_tree(&board, 0, 2, i16::MIN, board.hash_board(), &mut rep_map)));
+    println!("last depth search - {}", bench(|| search_game_tree_base_case(moves.clone(), &board, i16::MIN, board.hash_board(), &mut rep_map)));
+    println!("get unordered moves - {}", bench(|| Moves::get_all_moves(&board, board.turn)));
+    println!("get ordered moves - {}", bench(|| get_ordered_moves(&board)));
 }
