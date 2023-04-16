@@ -1,11 +1,13 @@
 use std::fmt::Display;
 
+use thiserror::Error;
+
 use crate::{
     move_generator::{
         models::{Color, PieceType, Square, ChessPiece},
     },
     move_register::{
-        models::{MoveError, MoveType, ChessMove},
+        models::{MoveError, MoveType, ChessMove, PromotedPieceType},
     }, chess_bot::zobrist::zobrist_hash,
 };
 
@@ -62,6 +64,36 @@ impl TryFrom<&str> for FenPieceType {
             "r" => Ok(FenPieceType::BlackRook),
             "b" => Ok(FenPieceType::BlackBishop),
             "q" => Ok(FenPieceType::BlackQueen),
+            _ => Err(BoardError::ConversionFailure),
+        }
+    }
+}
+
+impl TryFrom<&str> for PieceType {
+    type Error = BoardError;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        match val {
+            "P" => Ok(PieceType::Pawn),
+            "N" => Ok(PieceType::Knight),
+            "K" => Ok(PieceType::King),
+            "R" => Ok(PieceType::Rook),
+            "B" => Ok(PieceType::Bishop),
+            "Q" => Ok(PieceType::Queen),
+            _ => Err(BoardError::ConversionFailure),
+        }
+    }
+}
+
+impl TryFrom<&str> for PromotedPieceType {
+    type Error = BoardError;
+
+    fn try_from(val: &str) -> Result<Self, Self::Error> {
+        match val {
+            "N" => Ok(PromotedPieceType::Knight),
+            "R" => Ok(PromotedPieceType::Rook),
+            "B" => Ok(PromotedPieceType::Bishop),
+            "Q" => Ok(PromotedPieceType::Queen),
             _ => Err(BoardError::ConversionFailure),
         }
     }
@@ -434,7 +466,8 @@ impl Display for Board {
     }
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum BoardError {
+    #[error("Failed to parse the board")]
     ConversionFailure,
 }

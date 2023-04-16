@@ -35,6 +35,16 @@ pub enum MoveType {
     PromotionCapture(PromotedPieceType),
 }
 
+#[derive(PartialEq, Clone, Copy)]
+pub enum RawMoveType {
+    Move,
+    Capture,
+    EnPassantMove,
+    CastleMove,
+    PromotionMove,
+    PromotionCapture,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChessMove {
     pub move_type: MoveType,

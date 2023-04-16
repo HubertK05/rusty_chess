@@ -305,10 +305,10 @@ pub fn get_pawn_captures(board: &Board, start: Square, color: Color) -> impl Ite
         };
 
         if p.color != color && sq.1 == promotion_rank {
-            res[i * 4] = Some(ChessMove { move_type: MoveType::PromotionMove(PromotedPieceType::Queen), from: start, to: sq });
-            res[i * 4 + 1] = Some(ChessMove { move_type: MoveType::PromotionMove(PromotedPieceType::Bishop), from: start, to: sq });
-            res[i * 4 + 2] = Some(ChessMove { move_type: MoveType::PromotionMove(PromotedPieceType::Knight), from: start, to: sq });
-            res[i * 4 + 3] = Some(ChessMove { move_type: MoveType::PromotionMove(PromotedPieceType::Rook), from: start, to: sq });
+            res[i * 4] = Some(ChessMove { move_type: MoveType::PromotionCapture(PromotedPieceType::Queen), from: start, to: sq });
+            res[i * 4 + 1] = Some(ChessMove { move_type: MoveType::PromotionCapture(PromotedPieceType::Bishop), from: start, to: sq });
+            res[i * 4 + 2] = Some(ChessMove { move_type: MoveType::PromotionCapture(PromotedPieceType::Knight), from: start, to: sq });
+            res[i * 4 + 3] = Some(ChessMove { move_type: MoveType::PromotionCapture(PromotedPieceType::Rook), from: start, to: sq });
         } else if p.color != color {
             res[i * 4] = Some(ChessMove { move_type: MoveType::Capture(PieceType::Pawn), from: start, to: sq });
         }
