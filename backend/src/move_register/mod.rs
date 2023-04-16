@@ -19,7 +19,11 @@ fn move_register_move(from: Square, to: Square, board: &mut Board) -> Result<(),
 
     if p.piece_type == PieceType::Pawn {
         if (to - from).1.abs() == 2 {
-            board.set_ep_target_square(Some(to));
+            let target_sq = match p.color {
+                Color::White => to + Offset(0, -1),
+                Color::Black => to + Offset(0, 1),
+            };
+            board.set_ep_target_square(Some(target_sq));
         }
         board.reset_half_move_timer();
     }

@@ -319,15 +319,15 @@ pub fn get_pawn_captures(board: &Board, start: Square, color: Color) -> impl Ite
 
 pub fn get_en_passant(board: &Board, start: Square, color: Color) -> Option<ChessMove> {
     let target_sq = board.en_passant_square?;
-    if target_sq.1 - start.1 != 0 || (target_sq.0 - start.0).abs() != 1 {
+    let pawn_sq = match color {
+        Color::White => Square(target_sq.0, target_sq.1 - 1),
+        Color::Black => Square(target_sq.0, target_sq.1 + 1),
+    };
+    if pawn_sq.1 - start.1 != 0 || (pawn_sq.0 - start.0).abs() != 1 {
         return None;
     }
-    if board.get_square(target_sq)?.color != color {
-        let res = match color {
-            Color::White => Square(target_sq.0, target_sq.1 + 1),
-            Color::Black => Square(target_sq.0, target_sq.1 - 1),
-        };
-        Some(ChessMove { move_type: MoveType::EnPassantMove, from: start, to: res })
+    if board.get_square(pawn_sq)?.color != color {
+        Some(ChessMove { move_type: MoveType::EnPassantMove, from: start, to: target_sq })
     } else {
         None
     }

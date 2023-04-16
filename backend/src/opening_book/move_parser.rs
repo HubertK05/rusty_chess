@@ -10,131 +10,99 @@ pub fn parse_move(fen: FenNotation, san: String) -> Result<ChessMove, MoveParseE
 
     let pawn_move = Regex::new(r"^([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if pawn_move.is_match(&san) {
-        let piece_type = PieceType::Pawn;
-        let to_square = Square::try_from(&pawn_move.captures(&san).unwrap()[0]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_piece_type(piece_type)
+        let captures = &pawn_move.captures(&san).unwrap();
+        let moves = moves
+            .search_with_piece_type(PieceType::Pawn)
             .search_with_raw_move_types(&[RawMoveType::Move]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[0]);
         return Ok(filtered_moves[0])
     }
 
     let piece_move = Regex::new(r"^([BKNQR])([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if piece_move.is_match(&san) {
         let captures = piece_move.captures(&san).unwrap();
-        let piece_type = PieceType::try_from(&captures[1]).unwrap();
-        let to_square = Square::try_from(&captures[2]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_piece_type(piece_type)
-            .search_with_raw_move_types(&[RawMoveType::Move]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::Move]);
+        let moves = filter_moves_with_piece_type(moves, &captures[1]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[2]);
         return Ok(filtered_moves[0])
     }
 
     let pawn_capture = Regex::new(r"^([a-h])x([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if pawn_capture.is_match(&san) {
         let captures = pawn_capture.captures(&san).unwrap();
-        let from_file = (captures[1].chars().next().unwrap() as u8 - 97) as i8;
-        let to_square = Square::try_from(&captures[2]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
+        let moves = moves
             .search_with_piece_type(PieceType::Pawn)
-            .search_with_from_file(from_file)
             .search_with_raw_move_types(&[RawMoveType::Capture, RawMoveType::EnPassantMove]);
+        let moves = filter_moves_with_file_letter(moves, &captures[1]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[2]);
         return Ok(filtered_moves[0])
     }
 
     let piece_capture = Regex::new(r"^([BKNQR])x([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if piece_capture.is_match(&san) {
         let captures = pawn_capture.captures(&san).unwrap();
-        let piece_type = PieceType::try_from(&captures[1]).unwrap();
-        let to_square = Square::try_from(&captures[2]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_piece_type(piece_type)
-            .search_with_raw_move_types(&[RawMoveType::Capture]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::Capture]);
+        let moves = filter_moves_with_piece_type(moves, &captures[1]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[2]);
         return Ok(filtered_moves[0])
     }
 
     let piece_move = Regex::new(r"^([BKNQR])([a-h])([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if piece_move.is_match(&san) {
         let captures = piece_move.captures(&san).unwrap();
-        let piece_type = PieceType::try_from(&captures[1]).unwrap();
-        let from_file = (captures[2].chars().next().unwrap() as u8 - 97) as i8;
-        let to_square = Square::try_from(&captures[3]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_piece_type(piece_type)
-            .search_with_from_file(from_file)
-            .search_with_raw_move_types(&[RawMoveType::Move]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::Move]);
+        let moves = filter_moves_with_piece_type(moves, &captures[1]);
+        let moves = filter_moves_with_file_letter(moves, &captures[2]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[3]);
         return Ok(filtered_moves[0])
     }
 
     let piece_move = Regex::new(r"^([BKNQR])([1-8])([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if piece_move.is_match(&san) {
         let captures = piece_move.captures(&san).unwrap();
-        let piece_type = PieceType::try_from(&captures[1]).unwrap();
-        let from_rank = captures[2].parse::<i8>().unwrap() - 1;
-        let to_square = Square::try_from(&captures[3]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_piece_type(piece_type)
-            .search_with_from_rank(from_rank)
-            .search_with_raw_move_types(&[RawMoveType::Move]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::Move]);
+        let moves = filter_moves_with_piece_type(moves, &captures[1]);
+        let moves = filter_moves_with_rank_number(moves, &captures[2]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[3]);
         return Ok(filtered_moves[0])
     }
 
     let piece_capture = Regex::new(r"^([BKNQR])([a-h])x([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if piece_capture.is_match(&san) {
         let captures = piece_capture.captures(&san).unwrap();
-        let piece_type = PieceType::try_from(&captures[1]).unwrap();
-        let from_file = (captures[2].chars().next().unwrap() as u8 - 97) as i8;
-        let to_square = Square::try_from(&captures[3]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_piece_type(piece_type)
-            .search_with_from_file(from_file)
-            .search_with_raw_move_types(&[RawMoveType::Capture]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::Capture]);
+        let moves = filter_moves_with_piece_type(moves, &captures[1]);
+        let moves = filter_moves_with_file_letter(moves, &captures[2]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[3]);
         return Ok(filtered_moves[0])
     }
 
     let piece_capture = Regex::new(r"^([BKNQR])([1-8])x([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if piece_capture.is_match(&san) {
         let captures = piece_capture.captures(&san).unwrap();
-        let piece_type = PieceType::try_from(&captures[1]).unwrap();
-        let from_rank = captures[2].parse::<i8>().unwrap() - 1;
-        let to_square = Square::try_from(&captures[3]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_piece_type(piece_type)
-            .search_with_from_rank(from_rank)
-            .search_with_raw_move_types(&[RawMoveType::Capture]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::Capture]);
+        let moves = filter_moves_with_piece_type(moves, &captures[1]);
+        let moves = filter_moves_with_rank_number(moves, &captures[2]);
+        let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[3]);
         return Ok(filtered_moves[0])
     }
 
     let promotion = Regex::new(r"^([a-h][1-8])=([BNQR])\+?#?$").context("Regex creation failed")?;
     if promotion.is_match(&san) {
         let captures = promotion.captures(&san).unwrap();
-        let to_square = Square::try_from(&captures[1]).unwrap();
-        let promoted_piece_type = PromotedPieceType::try_from(&captures[2]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_promoted_piece_type(promoted_piece_type)
-            .search_with_raw_move_types(&[RawMoveType::PromotionMove]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::PromotionMove]);
+        let moves = filter_moves_with_to_square(moves, &captures[1]);
+        let Moves(filtered_moves) = filter_moves_with_promoted_piece_type(moves, &captures[2]);
         return Ok(filtered_moves[0])
     }
 
     let promotion_capture = Regex::new(r"^([a-h])x([a-h][1-8])=([BNQR])\+?#?$").context("Regex creation failed")?;
     if promotion_capture.is_match(&san) {
         let captures = promotion_capture.captures(&san).unwrap();
-        let from_file = (captures[1].chars().next().unwrap() as u8 - 97) as i8;
-        let to_square = Square::try_from(&captures[2]).unwrap();
-        let promoted_piece_type = PromotedPieceType::try_from(&captures[3]).unwrap();
-        let Moves(filtered_moves) = moves
-            .search_with_to(to_square)
-            .search_with_from_file(from_file)
-            .search_with_promoted_piece_type(promoted_piece_type)
-            .search_with_raw_move_types(&[RawMoveType::PromotionCapture]);
+        let moves = moves.search_with_raw_move_types(&[RawMoveType::PromotionCapture]);
+        let moves = filter_moves_with_file_letter(moves, &captures[1]);
+        let moves = filter_moves_with_to_square(moves, &captures[2]);
+        let Moves(filtered_moves) = filter_moves_with_promoted_piece_type(moves, &captures[3]);
         return Ok(filtered_moves[0])
     }
 
@@ -169,6 +137,31 @@ pub fn parse_move(fen: FenNotation, san: String) -> Result<ChessMove, MoveParseE
     }
 
     Err(MoveParseError::InvalidMove)
+}
+
+fn filter_moves_with_to_square(moves: Moves, to: &str) -> Moves {
+    let to_square = Square::try_from(to).unwrap();
+    moves.search_with_to(to_square)
+}
+
+fn filter_moves_with_file_letter(moves: Moves, file_letter: &str) -> Moves {
+    let from_file = (file_letter.chars().next().unwrap() as u8 - 97) as i8;
+    moves.search_with_from_file(from_file)
+}
+
+fn filter_moves_with_rank_number(moves: Moves, rank_number: &str) -> Moves {
+    let from_rank = rank_number.parse::<i8>().unwrap() - 1;
+    moves.search_with_from_rank(from_rank)
+}
+
+fn filter_moves_with_piece_type(moves: Moves, pt: &str) -> Moves {
+    let piece_type = PieceType::try_from(pt).unwrap();
+    moves.search_with_piece_type(piece_type)
+}
+
+fn filter_moves_with_promoted_piece_type(moves: Moves, ppt: &str) -> Moves {
+    let promoted_piece_type = PromotedPieceType::try_from(ppt).unwrap();
+    moves.search_with_promoted_piece_type(promoted_piece_type)
 }
 
 #[derive(Error, Debug)]
@@ -243,7 +236,7 @@ mod tests {
         assert_eq!(
             res.unwrap(),
             ChessMove {
-                move_type: MoveType::Capture(PieceType::Pawn),
+                move_type: MoveType::EnPassantMove,
                 from: Square(2, 3),
                 to: Square(3, 2),
             }

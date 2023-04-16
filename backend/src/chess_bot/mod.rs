@@ -261,8 +261,13 @@ pub fn evaluate_chg(board: &Board, mov: ChessMove, is_endgame: bool) -> i16 {
             -piece_value(to, is_endgame)
         },
         MoveType::EnPassantMove => {
-            let captured_piece = board.en_passant_square.and_then(|sq| board.get_square(sq))
-                .expect("no pawn is the en passant target square");
+            let pawn_sq = board.en_passant_square.expect("no en passant target square found") + match board.turn {
+                Color::White => Offset(0, -1),
+                Color::Black => Offset(0, 1),
+            };
+
+            let captured_piece = board.get_square(pawn_sq)
+                .expect("no pawn next to en passant target square");
             -piece_value(captured_piece, is_endgame)
         },
         MoveType::CastleMove(castle_type) => castle_value_chg_for_rook(castle_type),

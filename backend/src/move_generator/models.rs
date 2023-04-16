@@ -322,19 +322,18 @@ impl Moves {
     }
 
     pub fn search_with_raw_move_types(&self, move_types: &[RawMoveType]) -> Self {
-        let mut move_type_iter = move_types.into_iter();
         Self(self.0.iter().copied().filter(|&mov| match mov.move_type {
-            MoveType::Move(_) => move_type_iter.any(|&move_type| move_type == RawMoveType::Move),
-            MoveType::Capture(_) => move_type_iter.any(|&move_type| move_type == RawMoveType::Capture),
-            MoveType::EnPassantMove => move_type_iter.any(|&move_type| move_type == RawMoveType::EnPassantMove),
-            MoveType::CastleMove(_) => move_type_iter.any(|&move_type| move_type == RawMoveType::CastleMove),
-            MoveType::PromotionMove(_) => move_type_iter.any(|&move_type| move_type == RawMoveType::PromotionMove),
-            MoveType::PromotionCapture(_) => move_type_iter.any(|&move_type| move_type == RawMoveType::PromotionCapture),
+            MoveType::Move(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::Move),
+            MoveType::Capture(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::Capture),
+            MoveType::EnPassantMove => move_types.iter().any(|&move_type| move_type == RawMoveType::EnPassantMove),
+            MoveType::CastleMove(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::CastleMove),
+            MoveType::PromotionMove(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::PromotionMove),
+            MoveType::PromotionCapture(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::PromotionCapture),
         }).collect())
     }
 
     pub fn find(&self, from: Square, to: Square) -> Option<ChessMove> {
-        self.0.iter().cloned().filter(|mov| mov.from == from && mov.to == to).next()
+        self.0.iter().copied().filter(|mov| mov.from == from && mov.to == to).next()
     }
 }
 

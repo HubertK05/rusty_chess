@@ -1,6 +1,6 @@
 use rand::{thread_rng, Rng};
 
-use crate::{board_setup::models::Board, move_generator::models::{Square, PieceType, Color}, move_register::models::{CastleType, ChessMove, MoveType}};
+use crate::{board_setup::models::Board, move_generator::models::{Square, PieceType, Color, Offset}, move_register::models::{CastleType, ChessMove, MoveType}};
 
 use super::bitmasks::INIT_ZOBRIST_BITMASKS;
 
@@ -131,8 +131,13 @@ pub fn hash_with_move(mut hash: u64, board: &Board, played_move: ChessMove) -> u
         },
         MoveType::EnPassantMove => {
             let ep_target_sq = board.en_passant_square.expect("no en passant target square found");
+            let pawn_sq = ep_target_sq + match board.turn {
+                Color::White => Offset(0, -1),
+                Color::Black => Offset(0, 1),
+            };
+
             hash = hash.with(HashedData::Square(played_move.to, moved_piece.piece_type, moved_piece.color))
-                .with(HashedData::Square(ep_target_sq, PieceType::Pawn, moved_piece.color.opp()));
+                .with(HashedData::Square(pawn_sq, PieceType::Pawn, moved_piece.color.opp()));
         },
         MoveType::CastleMove(castle_type) => {
             let (rook_from, rook_to) = match castle_type {

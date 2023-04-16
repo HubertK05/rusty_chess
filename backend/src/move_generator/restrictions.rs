@@ -179,6 +179,11 @@ pub fn get_pins(board: &Board, color: Color) -> PinSquares {
     }
 
     if let Some(en_passant_sq) = board.en_passant_square {
+        let en_passant_sq = match board.turn {
+            Color::White => en_passant_sq + Offset(0, -1),
+            Color::Black => en_passant_sq + Offset(0, 1),
+        };
+
         let mut your_pawn_count = 0;
         let mut your_pawn_pos = None;
         for dir in [MoveDir::Left, MoveDir::Right] {
