@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::thread::JoinHandle;
 use std::env;
 
-use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}, move_register::models::ChessMove};
+use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}, move_register::models::ChessMove, opening_book::OpeningBook};
 use egui::{Ui, ColorImage, Vec2, Color32, Button};
 use egui_extras::RetainedImage;
 
@@ -84,7 +84,8 @@ pub struct ChessGui {
     pub reversed: bool,
     pub assets: Assets,
     pub bot_thread: Option<JoinHandle<ChessMove>>,
-    pub bot_settings: (bool, bool)
+    pub bot_settings: (bool, bool),
+    pub book: OpeningBook,
 }
 
 impl ChessGui {
@@ -100,7 +101,8 @@ impl ChessGui {
             reversed: false,
             assets,
             bot_thread: None,
-            bot_settings: (false, false)
+            bot_settings: (false, false),
+            book: OpeningBook::from_file("opening_book.txt"),
         }
     }
 
@@ -113,7 +115,8 @@ impl ChessGui {
             reversed: false,
             assets,
             bot_thread: None,
-            bot_settings: (false, false)
+            bot_settings: (false, false),
+            book: OpeningBook::from_file("opening_book.txt"),
         }
     }
 

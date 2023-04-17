@@ -40,7 +40,7 @@ pub fn parse_move(fen: FenNotation, san: String) -> Result<ChessMove, MoveParseE
 
     let piece_capture = Regex::new(r"^([BKNQR])x([a-h][1-8])\+?#?$").context("Regex creation failed")?;
     if piece_capture.is_match(&san) {
-        let captures = pawn_capture.captures(&san).unwrap();
+        let captures = piece_capture.captures(&san).unwrap();
         let moves = moves.search_with_raw_move_types(&[RawMoveType::Capture]);
         let moves = filter_moves_with_piece_type(moves, &captures[1]);
         let Moves(filtered_moves) = filter_moves_with_to_square(moves, &captures[2]);

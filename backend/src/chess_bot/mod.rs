@@ -4,7 +4,9 @@ pub mod bitmasks;
 pub mod pawn_structure;
 
 use std::{cmp::Ordering, collections::BTreeMap};
-use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::Board, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece, Offset}, restrictions::get_checked}};
+use rand::{seq::SliceRandom, thread_rng};
+
+use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::{Board, FenNotation}, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece, Offset}, restrictions::get_checked}, opening_book::{OpeningBook, move_parser::parse_move}};
 use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move, pawn_structure::get_pawn_weaknesses_from_board};
 
 const PRUNING: bool = true;
@@ -22,17 +24,28 @@ pub const MVV_LVA_TABLE: [[i16; 6]; 6] = [
     [39, 38, 37, 36, 35, 15], // P
 ];
 
-pub fn choose_move(board: &Board, mut rep_map: BTreeMap<u64, u8>) -> Option<ChessMove> {
+pub fn choose_move(board: &Board, mut rep_map: BTreeMap<u64, u8>, book: &OpeningBook) -> Option<ChessMove> {
     let limit = match board.turn {
         Color::White => i16::MAX,
         Color::Black => i16::MIN,
     };
 
-    let hash = board.hash_board();
+    let fen = FenNotation::try_from(board).expect("failed to get fen from board");
 
-    let res = search_game_tree(board, 0, SEARCH_DEPTH, limit, hash, &mut rep_map);
-    println!("eval: {}\nthe number of positions tested: {}", res.1, res.2);
-    res.0
+    if let Some(move_vec) = book.0.get(&fen.to_draw_fen()) {
+        let mut rng = thread_rng();
+        let san = move_vec.choose_weighted(&mut rng, |(_, popularity)| *popularity).unwrap();
+        let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
+        println!("played book move");
+
+        Some(res)
+    } else {
+        let hash = board.hash_board();
+
+        let res = search_game_tree(board, 0, SEARCH_DEPTH, limit, hash, &mut rep_map);
+        println!("eval: {}\nthe number of positions tested: {}", res.1, res.2);
+        res.0
+    }
 }
 
 fn is_in_check(board: &Board) -> bool {

@@ -166,8 +166,9 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
     if state.game_state.is_ongoing() && state.get_bot_settings(state.board.turn) && state.bot_thread.is_none() {
         let board = state.board;
         let rep_map = state.repetition_map.clone();
+        let book = state.book.clone();
         let chosen_move = std::thread::spawn(move || {
-            choose_move(&board, rep_map).expect("oops, failed to choose a move")
+            choose_move(&board, rep_map, &book).expect("oops, failed to choose a move")
         });
         state.bot_thread = Some(chosen_move);
     }

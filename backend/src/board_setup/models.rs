@@ -277,7 +277,7 @@ impl AvailableCastles {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FenNotation(pub String);
 
 impl FenNotation {
@@ -447,6 +447,13 @@ impl TryFrom<FenNotation> for Board {
             mating_material,
             king_positions: (white_king_pos, black_king_pos),
         })
+    }
+}
+
+impl Display for FenNotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(val) = self;
+        write!(f, "{val}")
     }
 }
 
