@@ -50,3 +50,10 @@ pub fn get_pawn_weaknesses_from_board(board: &Board) -> (u8, u8, u8, u8) {
     let isolated = structure.count_isolated_pawns();
     (doubled.0, doubled.1, isolated.0, isolated.1)
 }
+
+pub fn evaluate_pawn_weaknesses(board: &Board) -> i16 {
+    let structure = PawnStructure::get_from_board(board);
+    let doubled = structure.count_doubled_pawns();
+    let isolated = structure.count_isolated_pawns();
+    (doubled.1 as i16 - doubled.0 as i16 + isolated.1 as i16 - isolated.0 as i16) * 50
+}

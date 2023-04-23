@@ -1,15 +1,14 @@
-use std::{collections::{BTreeMap, HashMap}, fs::File, io::{Write, Read}};
+use std::{collections::{BTreeMap, HashMap}, fs::File, io::Write};
 
 use backend::{
     board_setup::models::{Board, FenNotation}, move_generator::models::{Moves, Color, PieceType, Square}, move_register::models::{MoveType, ChessMove}, chess_bot::{search_game_tree, search_game_tree_base_case, get_ordered_moves, evaluate_chg, is_endgame, is_attacked_by_pawn}, opening_book::{get_opening_book, OpeningBook},
 };
 use easybench::bench;
 
-const DO_BENCHMARKS: bool = false;
+const DO_BENCHMARKS: bool = true;
 const CREATE_BOOK: bool = false;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     if DO_BENCHMARKS {
         do_benchmarks();
     }
@@ -55,8 +54,8 @@ fn do_benchmarks() {
         });
         move_set
     }));
-    println!("search to depth 2 - {}", bench(|| search_game_tree(&board, 0, 2, i16::MIN, board.hash_board(), &mut rep_map)));
-    println!("last depth search - {}", bench(|| search_game_tree_base_case(moves.clone(), &board, i16::MIN, board.hash_board(), &mut rep_map)));
+    println!("search to depth 2 - {}", bench(|| search_game_tree(&board, 0, 2, i32::MIN, board.hash_board(), &mut rep_map)));
+    println!("last depth search - {}", bench(|| search_game_tree_base_case(moves.clone(), &board, i32::MIN, board.hash_board(), &mut rep_map)));
     println!("get unordered moves - {}", bench(|| Moves::get_all_moves(&board, board.turn)));
     println!("get ordered moves - {}", bench(|| get_ordered_moves(&board)));
 }
