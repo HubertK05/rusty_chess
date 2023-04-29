@@ -93,6 +93,13 @@ impl ChessGui {
         let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into()))
         .unwrap();
         let legal_moves = Moves::get_all_moves(&board, Color::White);
+        let path = if FOR_EXTERNAL_USE {
+            let exe_path = env::current_exe().unwrap();
+            exe_path.parent().unwrap().as_os_str().to_str().unwrap().to_string() + "/"
+        } else {
+            "".to_string()
+        };
+
         Self {
             board,
             legal_moves,
@@ -102,7 +109,7 @@ impl ChessGui {
             assets,
             bot_thread: None,
             bot_settings: (false, false),
-            book: OpeningBook::from_file("opening_book.txt"),
+            book: OpeningBook::from_file(&(path + "opening_book.txt")),
         }
     }
 
