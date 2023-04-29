@@ -3,3 +3,5 @@
 /gui/Cargo.lock
 Cargo.lock
 /target
+/.vscode
+*/opening_book.txt
