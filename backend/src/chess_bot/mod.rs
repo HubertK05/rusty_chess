@@ -9,12 +9,13 @@ use std::{cmp::Ordering, collections::BTreeMap};
 use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{move_register::models::{ChessMove, MoveType, CastleType, PromotedPieceType}, board_setup::models::{Board, FenNotation}, move_generator::{models::{Moves, Square, Color, PieceType, ChessPiece, Offset}, restrictions::get_checked}, opening_book::{OpeningBook, move_parser::parse_move}};
-use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move, pawn_structure::{get_pawn_weaknesses_from_board, evaluate_pawn_weaknesses}, space_eval::Space, evaluation::Evaluation};
+use self::{piece_tables::{PAWN_TABLE, KNIGHT_TABLE, BISHOP_TABLE, ROOK_TABLE, QUEEN_TABLE, KING_TABLE, KING_ENDGAME_TABLE}, zobrist::hash_with_move, pawn_structure::evaluate_pawn_weaknesses, space_eval::Space, evaluation::Evaluation};
 
+const EVAL_PRINT: bool = true;
 const PRUNING: bool = true;
-const POSITIONAL_VALUE_FACTOR: i32 = 70;
+const POSITIONAL_VALUE_FACTOR: i32 = 60;
 const MATERIAL_VALUE: bool = true;
-const SEARCH_DEPTH: u8 = 6;
+const SEARCH_DEPTH: u8 = 5;
 
 pub const MVV_LVA_TABLE: [[i16; 6]; 6] = [
     //K   Q   R   B   N   P
@@ -127,9 +128,11 @@ fn new_best_move(best_move: Option<ChessMove>, best_eval: Evaluation, best_line:
     }
 }
 
-pub fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i32, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, Evaluation, u64) {
+pub fn verify_capture(board: &Board, limit: i32, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, Evaluation, u64) {
+    let moves = get_ordered_moves(board);
+
     let is_endgame = is_endgame(board);
-    let move_iter = move_set.into_iter();
+    let move_iter = moves.into_iter();
     let mut position_num = 0;
 
     let mut best_move: Option<ChessMove> = None;
@@ -141,8 +144,9 @@ pub fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit
     for test_move in move_iter {
         let mut new_board = *board;
         let _= new_board.register_move(test_move);
-        let res = evaluate_position(&new_board, is_endgame);
         let new_hash = hash_with_move(hash, board, test_move);
+
+        let res = evaluate_position(&new_board, is_endgame);
 
         let rep_num = *rep_map.entry(new_hash).and_modify(|x| *x += 1).or_insert(1);
         let res = if rep_num >= 3 {
@@ -171,7 +175,56 @@ pub fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit
     (best_move, best_eval, position_num)
 }
 
+pub fn search_game_tree_base_case(move_set: Vec<ChessMove>, board: &Board, limit: i32, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, Evaluation, u64) {
+    let is_endgame = is_endgame(board);
+    let move_iter = move_set.into_iter();
+    let mut position_num = 0;
+
+    let mut best_move: Option<ChessMove> = None;
+    let mut best_eval = match board.turn {
+        Color::White => Evaluation::MIN,
+        Color::Black => Evaluation::MAX,
+    };
+
+    for test_move in move_iter {
+        let mut new_board = *board;
+        let _= new_board.register_move(test_move);
+        let new_hash = hash_with_move(hash, board, test_move);
+
+        let res = match test_move.move_type {
+            MoveType::Move(_) | MoveType::CastleMove(_) => (Some(test_move), evaluate_position(&new_board, is_endgame), 1),
+            _ => verify_capture(&new_board, best_eval.total(), new_hash, rep_map),
+        };
+        
+        let rep_num = *rep_map.entry(new_hash).and_modify(|x| *x += 1).or_insert(1);
+        let res = if rep_num >= 3 {
+            Evaluation::new()
+        } else {
+            res.1.with_positional_factor(POSITIONAL_VALUE_FACTOR)
+        };
+        rep_map.entry(new_hash).and_modify(|x| *x -= 1).or_insert(1);
+
+        (best_move, best_eval, _) = new_best_move(best_move, best_eval, None, test_move, res, None, board.turn);
+
+        position_num += 1;
+
+        if PRUNING {
+            match board.turn {
+                Color::White => if res.total() >= limit as i32 {
+                    return (None, Evaluation::MAX_MATERIAL, position_num);
+                },
+                Color::Black => if res.total() <= limit as i32 {
+                    return (None, Evaluation::MIN_MATERIAL, position_num);
+                },
+            };
+        }
+    };
+
+    (best_move, best_eval, position_num)
+}
+
 pub fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i32, hash: u64, rep_map: &mut BTreeMap<u64, u8>) -> (Option<ChessMove>, Evaluation, u64, Vec<ChessMove>) {
+    // println!("{}", FenNotation::from(board));
     let move_set = get_ordered_moves(board);
     if move_set.len() == 0 {
         if is_in_check(board) {
@@ -231,7 +284,7 @@ pub fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i32, has
         };
         rep_map.entry(new_hash).and_modify(|x| *x -= 1);
 
-        if depth == 0 {
+        if depth == 0 && EVAL_PRINT {
             if res != Evaluation::MIN_MATERIAL && res != Evaluation::MAX_MATERIAL {
                 println!("evaluation of the move {test_move}: {res}");
                 let mut new_board = *board;
@@ -242,7 +295,7 @@ pub fn search_game_tree(board: &Board, depth: u8, max_depth: u8, limit: i32, has
                     print!("{mov}, ");
                     let _ = new_board.register_move(mov);
                 });
-                println!(", which results in board:\n{new_board}")
+                // println!(", which results in board:\n{new_board}")
             } else {
                 println!("evaluation of the move {test_move}: pruned");
             }
@@ -355,14 +408,13 @@ fn piece_value_chg(piece: ChessPiece, played_move: ChessMove, is_endgame: bool) 
 }
  
 fn piece_value(piece: ChessPiece, is_endgame: bool) -> (i16, i16) {
-    let mut material = 0;
-    let mut pst = 0;
+    let material = if MATERIAL_VALUE {
+        material_value(piece.piece_type)
+    } else {
+        0
+    };
 
-    if MATERIAL_VALUE {
-        material = material_value(piece.piece_type)
-    }
-
-    pst = positional_value(piece, is_endgame);
+    let pst = positional_value(piece, is_endgame);
     
     match piece.color {
         Color::White => (material, pst),
