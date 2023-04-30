@@ -192,8 +192,9 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
         let board = state.board;
         let rep_map = state.repetition_map.clone();
         let book = state.book.clone();
+        let settings = state.ext_settings;
         let chosen_move = std::thread::spawn(move || {
-            choose_move(&board, rep_map, &book).expect("oops, failed to choose a move")
+            choose_move(&board, rep_map, &book, settings).expect("oops, failed to choose a move")
         });
         state.bot_thread = Some(chosen_move);
     }

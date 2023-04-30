@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.69"
 async-recursion = "1.0.4"
+config = "0.13.3"
 dyn-clone = "1.0.10"
 easybench = "1.1.0"
 itertools = "0.10.5"

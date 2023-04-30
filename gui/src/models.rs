@@ -6,14 +6,14 @@ use backend::{
     board_setup::models::{Board, FenNotation},
     move_generator::models::{Color, Moves, PieceType},
     move_register::models::ChessMove,
-    opening_book::OpeningBook,
+    opening_book::OpeningBook, config::AppSettings,
 };
 use egui::{Button, Color32, ColorImage, Ui, Vec2};
 use egui_extras::RetainedImage;
 
 use crate::{
     additions::{new_bg, paint_max_rect},
-    chess_ui,
+    chess_ui, 
 };
 
 const FOR_EXTERNAL_USE: bool = false;
@@ -100,6 +100,7 @@ pub struct ChessGui {
     pub bot_thread: Option<JoinHandle<ChessMove>>,
     pub bot_settings: (bool, bool),
     pub book: OpeningBook,
+    pub ext_settings: AppSettings,
 }
 
 impl ChessGui {
@@ -132,7 +133,8 @@ impl ChessGui {
             assets,
             bot_thread: None,
             bot_settings: (false, false),
-            book: OpeningBook::from_file(&(path + "opening_book.txt")),
+            book: OpeningBook::from_file(&(path.clone() + "opening_book.txt")),
+            ext_settings: AppSettings::get_from_file(&(path + "config/settings.toml")).expect("failed to get settings"),
         }
     }
 
@@ -147,6 +149,7 @@ impl ChessGui {
             bot_thread: None,
             bot_settings: (false, false),
             book: OpeningBook::from_file("opening_book.txt"),
+            ext_settings: AppSettings::get_from_file("./config/settings.toml").expect("failed to get settings"),
         }
     }
 

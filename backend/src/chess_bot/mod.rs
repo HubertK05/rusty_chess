@@ -22,14 +22,8 @@ use crate::{
         restrictions::get_checked,
     },
     move_register::models::{ChessMove, MoveType},
-    opening_book::{move_parser::parse_move, OpeningBook},
+    opening_book::{move_parser::parse_move, OpeningBook}, config::AppSettings,
 };
-
-const EVAL_PRINT: bool = true;
-const PRUNING: bool = true;
-const POSITIONAL_VALUE_FACTOR: i32 = 60;
-const MATERIAL_VALUE: bool = true;
-const SEARCH_DEPTH: u8 = 6;
 
 pub const MVV_LVA_TABLE: [[i16; 6]; 6] = [
     //K   Q   R   B   N   P
@@ -87,6 +81,7 @@ pub fn choose_move(
     board: &Board,
     mut rep_map: BTreeMap<u64, u8>,
     book: &OpeningBook,
+    settings: AppSettings,
 ) -> Option<ChessMove> {
     let limit = match board.turn {
         Color::White => i16::MAX,
@@ -107,10 +102,10 @@ pub fn choose_move(
     } else {
         let hash = board.hash_board();
 
-        let (payload, pos_count) = if SEARCH_DEPTH == 1 {
-            search_game_tree(board, 0, SEARCH_DEPTH, limit as i32, hash, &mut rep_map)
+        let (payload, pos_count) = if settings.search_depth == 1 {
+            search_game_tree(board, 0, settings.search_depth, limit as i32, hash, &mut rep_map, settings)
         } else {
-            search_game_tree(board, 0, SEARCH_DEPTH, limit as i32, hash, &mut rep_map)
+            search_game_tree(board, 0, settings.search_depth, limit as i32, hash, &mut rep_map, settings)
         };
         println!(
             "eval: {}\nthe number of positions tested: {pos_count}",
@@ -196,9 +191,10 @@ pub fn search_game_tree(
     limit: i32,
     hash: u64,
     rep_map: &mut BTreeMap<u64, u8>,
+    settings: AppSettings,
 ) -> (MovePayload, u64) {
     let move_set = get_ordered_moves(board);
-    let base_eval = evaluate_position(board).with_positional_factor(POSITIONAL_VALUE_FACTOR);
+    let base_eval = evaluate_position(board).with_positional_factor(settings.positional_value_factor);
     let is_endgame = is_endgame(board);
 
     if move_set.len() == 0 {
@@ -238,6 +234,7 @@ pub fn search_game_tree(
                         payload.eval.total() as i32,
                         new_hash,
                         rep_map,
+                        settings,
                     )
                 } else {
                     (
@@ -245,7 +242,7 @@ pub fn search_game_tree(
                             Some(test_move),
                                 base_eval
                                 + evaluate_chg(board, test_move, is_endgame)
-                                .with_positional_factor(POSITIONAL_VALUE_FACTOR),
+                                .with_positional_factor(settings.positional_value_factor),
                             Vec::new(),
                         ),
                         1,
@@ -268,7 +265,7 @@ pub fn search_game_tree(
         );
         rep_map.entry(new_hash).and_modify(|x| *x -= 1);
 
-        if depth == 0 && EVAL_PRINT {
+        if depth == 0 && settings.eval_print {
             if branch_payload.played_move.is_some() {
                 print_eval(new_board, test_move, branch_payload.eval, &branch_payload.line);
             } else {
@@ -278,7 +275,7 @@ pub fn search_game_tree(
 
         position_count += branch_pos_count;
 
-        if PRUNING {
+        if settings.pruning {
             match board.turn {
                 Color::White => {
                     if branch_payload.eval.total() >= limit {

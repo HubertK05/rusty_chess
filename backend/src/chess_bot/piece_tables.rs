@@ -4,7 +4,7 @@ use crate::{
     move_register::models::{CastleType, ChessMove, MoveType, PromotedPieceType},
 };
 
-use super::{MATERIAL_VALUE, evaluation::Evaluation};
+use super::evaluation::Evaluation;
 
 pub const KING_TABLE: [[i16; 8]; 8] = [
     [-30, -40, -40, -50, -50, -40, -40, -30],
@@ -171,13 +171,8 @@ fn piece_value_chg(piece: ChessPiece, played_move: ChessMove, is_endgame: bool) 
     (new_material - old_material, new_pst - old_pst)
 }
 
-pub fn piece_value(piece: ChessPiece, is_endgame: bool) -> (i16, i16) {
-    let material = if MATERIAL_VALUE {
-        material_value(piece.piece_type)
-    } else {
-        0
-    };
-
+pub fn piece_value(piece: ChessPiece, is_endgame: bool,) -> (i16, i16) {
+    let material = material_value(piece.piece_type);
     let pst = positional_value(piece, is_endgame);
 
     match piece.color {
