@@ -3,12 +3,9 @@ use std::fmt::Display;
 use thiserror::Error;
 
 use crate::{
-    move_generator::{
-        models::{Color, PieceType, Square, ChessPiece},
-    },
-    move_register::{
-        models::{MoveError, MoveType, ChessMove, PromotedPieceType},
-    }, chess_bot::zobrist::zobrist_hash,
+    chess_bot::zobrist::zobrist_hash,
+    move_generator::models::{ChessPiece, Color, PieceType, Square},
+    move_register::models::{ChessMove, MoveError, MoveType, PromotedPieceType},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -145,7 +142,10 @@ impl Board {
     }
 
     pub fn new_game() -> Self {
-        Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())).unwrap()
+        Board::try_from(FenNotation(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string(),
+        ))
+        .unwrap()
     }
 
     pub fn get_square(&self, sq: Square) -> Option<ChessPiece> {

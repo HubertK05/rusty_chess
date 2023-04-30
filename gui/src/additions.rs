@@ -1,5 +1,5 @@
 use eframe::epaint::RectShape;
-use egui::{Ui, layers::ShapeIdx, Shape, Color32};
+use egui::{layers::ShapeIdx, Color32, Shape, Ui};
 
 pub fn new_bg(ui: &mut Ui) -> ShapeIdx {
     ui.painter().add(Shape::Noop)

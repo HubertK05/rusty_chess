@@ -1,6 +1,10 @@
 use rand::{thread_rng, Rng};
 
-use crate::{board_setup::models::Board, move_generator::models::{Square, PieceType, Color, Offset}, move_register::models::{CastleType, ChessMove, MoveType}};
+use crate::{
+    board_setup::models::Board,
+    move_generator::models::{Color, Offset, PieceType, Square},
+    move_register::models::{CastleType, ChessMove, MoveType},
+};
 
 use super::bitmasks::INIT_ZOBRIST_BITMASKS;
 
@@ -54,7 +58,7 @@ impl ZobristBitmasks {
             }
         }
         let additional_bitmasks = rng.gen();
-    
+
         Self {
             square: square_bitmasks,
             additional: additional_bitmasks,
@@ -68,7 +72,11 @@ pub fn zobrist_hash(board: &Board) -> u64 {
     for rank in 0..8 as i8 {
         for file in 0..8 as i8 {
             if let Some(piece) = board.get_square(Square(file, rank)) {
-                res = res.with(HashedData::Square(Square(file, rank), piece.piece_type, piece.color));
+                res = res.with(HashedData::Square(
+                    Square(file, rank),
+                    piece.piece_type,
+                    piece.color,
+                ));
             }
         }
     }
@@ -103,42 +111,83 @@ pub trait ZobristHash {
 impl ZobristHash for u64 {
     fn with(self, data: HashedData) -> Self {
         self ^ match data {
-            HashedData::Square(sq, p_type, color) => INIT_ZOBRIST_BITMASKS.square[(sq.1 * 8 + sq.0) as usize][to_hash_idx(p_type, color)],
-            HashedData::Castling(c_type) => INIT_ZOBRIST_BITMASKS.additional[castle_to_hash_idx(c_type)],
-            HashedData::EnPassant(sq) => INIT_ZOBRIST_BITMASKS.square[(sq.1 * 8 + sq.0) as usize][12],
+            HashedData::Square(sq, p_type, color) => {
+                INIT_ZOBRIST_BITMASKS.square[(sq.1 * 8 + sq.0) as usize][to_hash_idx(p_type, color)]
+            }
+            HashedData::Castling(c_type) => {
+                INIT_ZOBRIST_BITMASKS.additional[castle_to_hash_idx(c_type)]
+            }
+            HashedData::EnPassant(sq) => {
+                INIT_ZOBRIST_BITMASKS.square[(sq.1 * 8 + sq.0) as usize][12]
+            }
             HashedData::Turn => INIT_ZOBRIST_BITMASKS.additional[4],
         }
     }
 }
 
 pub fn hash_with_move(mut hash: u64, board: &Board, played_move: ChessMove) -> u64 {
-    let moved_piece = board.get_square(played_move.from).expect("no piece found where it should be");
-    hash = hash.with(HashedData::Square(played_move.from, moved_piece.piece_type, moved_piece.color));
+    let moved_piece = board
+        .get_square(played_move.from)
+        .expect("no piece found where it should be");
+    hash = hash.with(HashedData::Square(
+        played_move.from,
+        moved_piece.piece_type,
+        moved_piece.color,
+    ));
     if let Some(sq) = board.en_passant_square {
         hash = hash.with(HashedData::EnPassant(sq));
     };
     match played_move.move_type {
         MoveType::Move(_) => {
-            hash = hash.with(HashedData::Square(played_move.to, moved_piece.piece_type, moved_piece.color));
-            if moved_piece.piece_type == PieceType::Pawn && (played_move.to - played_move.from).1.abs() == 2 {
+            hash = hash.with(HashedData::Square(
+                played_move.to,
+                moved_piece.piece_type,
+                moved_piece.color,
+            ));
+            if moved_piece.piece_type == PieceType::Pawn
+                && (played_move.to - played_move.from).1.abs() == 2
+            {
                 hash = hash.with(HashedData::EnPassant(played_move.to));
             };
-        },
+        }
         MoveType::Capture(_) => {
-            let captured_piece = board.get_square(played_move.to).expect("no piece found where it should be");
-            hash = hash.with(HashedData::Square(played_move.to, moved_piece.piece_type, moved_piece.color))
-                .with(HashedData::Square(played_move.to, captured_piece.piece_type, captured_piece.color));
-        },
+            let captured_piece = board
+                .get_square(played_move.to)
+                .expect("no piece found where it should be");
+            hash = hash
+                .with(HashedData::Square(
+                    played_move.to,
+                    moved_piece.piece_type,
+                    moved_piece.color,
+                ))
+                .with(HashedData::Square(
+                    played_move.to,
+                    captured_piece.piece_type,
+                    captured_piece.color,
+                ));
+        }
         MoveType::EnPassantMove => {
-            let ep_target_sq = board.en_passant_square.expect("no en passant target square found");
-            let pawn_sq = ep_target_sq + match board.turn {
-                Color::White => Offset(0, -1),
-                Color::Black => Offset(0, 1),
-            };
+            let ep_target_sq = board
+                .en_passant_square
+                .expect("no en passant target square found");
+            let pawn_sq = ep_target_sq
+                + match board.turn {
+                    Color::White => Offset(0, -1),
+                    Color::Black => Offset(0, 1),
+                };
 
-            hash = hash.with(HashedData::Square(played_move.to, moved_piece.piece_type, moved_piece.color))
-                .with(HashedData::Square(pawn_sq, PieceType::Pawn, moved_piece.color.opp()));
-        },
+            hash = hash
+                .with(HashedData::Square(
+                    played_move.to,
+                    moved_piece.piece_type,
+                    moved_piece.color,
+                ))
+                .with(HashedData::Square(
+                    pawn_sq,
+                    PieceType::Pawn,
+                    moved_piece.color.opp(),
+                ));
+        }
         MoveType::CastleMove(castle_type) => {
             let (rook_from, rook_to) = match castle_type {
                 CastleType::WhiteShort => (Square(7, 0), Square(5, 0)),
@@ -146,34 +195,78 @@ pub fn hash_with_move(mut hash: u64, board: &Board, played_move: ChessMove) -> u
                 CastleType::BlackShort => (Square(7, 7), Square(5, 7)),
                 CastleType::BlackLong => (Square(0, 7), Square(3, 7)),
             };
-            hash = hash.with(HashedData::Square(played_move.to, moved_piece.piece_type, moved_piece.color))
-                .with(HashedData::Square(rook_from, PieceType::Rook, moved_piece.color))
-                .with(HashedData::Square(rook_to, PieceType::Rook, moved_piece.color));
-        },
+            hash = hash
+                .with(HashedData::Square(
+                    played_move.to,
+                    moved_piece.piece_type,
+                    moved_piece.color,
+                ))
+                .with(HashedData::Square(
+                    rook_from,
+                    PieceType::Rook,
+                    moved_piece.color,
+                ))
+                .with(HashedData::Square(
+                    rook_to,
+                    PieceType::Rook,
+                    moved_piece.color,
+                ));
+        }
         MoveType::PromotionMove(ppt) => {
-            hash = hash.with(HashedData::Square(played_move.to, ppt.into(), moved_piece.color));
-        },
+            hash = hash.with(HashedData::Square(
+                played_move.to,
+                ppt.into(),
+                moved_piece.color,
+            ));
+        }
         MoveType::PromotionCapture(ppt) => {
-            let captured_piece = board.get_square(played_move.to).expect("no piece found where it should be");
-            hash = hash.with(HashedData::Square(played_move.to, captured_piece.piece_type, captured_piece.color))
-                .with(HashedData::Square(played_move.to, ppt.into(), moved_piece.color));
-        },
+            let captured_piece = board
+                .get_square(played_move.to)
+                .expect("no piece found where it should be");
+            hash = hash
+                .with(HashedData::Square(
+                    played_move.to,
+                    captured_piece.piece_type,
+                    captured_piece.color,
+                ))
+                .with(HashedData::Square(
+                    played_move.to,
+                    ppt.into(),
+                    moved_piece.color,
+                ));
+        }
     };
     hash = hash_with_castling(hash, board, played_move);
     hash.with(HashedData::Turn)
 }
 
 fn hash_with_castling(mut hash: u64, board: &Board, played_move: ChessMove) -> u64 {
-    if board.castling.white_long && (played_move.from == Square(0, 0) || played_move.to == Square(0, 0) || played_move.from == Square(4, 0)) {
+    if board.castling.white_long
+        && (played_move.from == Square(0, 0)
+            || played_move.to == Square(0, 0)
+            || played_move.from == Square(4, 0))
+    {
         hash = hash.with(HashedData::Castling(CastleType::WhiteLong));
     }
-    if board.castling.white_short && (played_move.from == Square(7, 0) || played_move.to == Square(7, 0) || played_move.from == Square(4, 0)) {
+    if board.castling.white_short
+        && (played_move.from == Square(7, 0)
+            || played_move.to == Square(7, 0)
+            || played_move.from == Square(4, 0))
+    {
         hash = hash.with(HashedData::Castling(CastleType::WhiteShort));
     }
-    if board.castling.black_long && (played_move.from == Square(0, 7) || played_move.to == Square(0, 7) || played_move.from == Square(4, 7)) {
+    if board.castling.black_long
+        && (played_move.from == Square(0, 7)
+            || played_move.to == Square(0, 7)
+            || played_move.from == Square(4, 7))
+    {
         hash = hash.with(HashedData::Castling(CastleType::BlackLong));
     }
-    if board.castling.black_short && (played_move.from == Square(7, 7) || played_move.to == Square(7, 7) || played_move.from == Square(4, 7)) {
+    if board.castling.black_short
+        && (played_move.from == Square(7, 7)
+            || played_move.to == Square(7, 7)
+            || played_move.from == Square(4, 7))
+    {
         hash = hash.with(HashedData::Castling(CastleType::BlackShort));
     }
     hash
@@ -181,7 +274,11 @@ fn hash_with_castling(mut hash: u64, board: &Board, played_move: ChessMove) -> u
 
 #[cfg(test)]
 mod tests {
-    use crate::{board_setup::models::Board, move_register::models::{ChessMove, MoveType}, move_generator::models::{Square, PieceType}};
+    use crate::{
+        board_setup::models::Board,
+        move_generator::models::{PieceType, Square},
+        move_register::models::{ChessMove, MoveType},
+    };
 
     use super::hash_with_move;
 
@@ -193,7 +290,7 @@ mod tests {
             from: Square(0, 6),
             to: Square(0, 5),
         };
-        let hash_1 = board.hash_board(); 
+        let hash_1 = board.hash_board();
         let hash_3 = hash_with_move(hash_1, &board, played_move);
         board.register_move(played_move).unwrap();
         let hash_2 = board.hash_board();

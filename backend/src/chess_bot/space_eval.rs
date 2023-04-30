@@ -1,4 +1,7 @@
-use crate::{board_setup::models::Board, move_generator::models::{Square, PieceType, Color}};
+use crate::{
+    board_setup::models::Board,
+    move_generator::models::{Color, PieceType, Square},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Space {
@@ -15,15 +18,21 @@ impl Space {
         }
 
         Self {
-            queenside: (res[0].0 + res[1].0 + res[2].0 , res[0].1 + res[1].1 + res[2].1),
-            central: (res[3].0 + res[4].0 , res[3].1 + res[4].1),
-            kingside: (res[5].0 + res[6].0 + res[7].0 , res[5].1 + res[6].1 + res[7].1),
+            queenside: (
+                res[0].0 + res[1].0 + res[2].0,
+                res[0].1 + res[1].1 + res[2].1,
+            ),
+            central: (res[3].0 + res[4].0, res[3].1 + res[4].1),
+            kingside: (
+                res[5].0 + res[6].0 + res[7].0,
+                res[5].1 + res[6].1 + res[7].1,
+            ),
         }
     }
 
     pub fn evaluate(self, board: &Board) -> i16 {
-        let white_king_file = board.king_positions.0.0;
-        let black_king_file = board.king_positions.1.0;
+        let white_king_file = board.king_positions.0 .0;
+        let black_king_file = board.king_positions.1 .0;
 
         let white_kingside_weight = match white_king_file {
             0..=2 => 5,
@@ -54,10 +63,12 @@ impl Space {
         };
 
         let central_weight = 5;
-        
-        let queenside_eval = self.queenside.0 as i16 * white_queenside_weight - self.queenside.1 as i16 * black_queenside_weight;
+
+        let queenside_eval = self.queenside.0 as i16 * white_queenside_weight
+            - self.queenside.1 as i16 * black_queenside_weight;
         let central_eval = (self.central.0 as i16 - self.central.1 as i16) * central_weight;
-        let kingside_eval = self.kingside.0 as i16 * white_kingside_weight - self.kingside.1 as i16 * black_kingside_weight;
+        let kingside_eval = self.kingside.0 as i16 * white_kingside_weight
+            - self.kingside.1 as i16 * black_kingside_weight;
 
         queenside_eval + central_eval + kingside_eval
     }

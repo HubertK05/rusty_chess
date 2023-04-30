@@ -1,12 +1,20 @@
 use std::collections::BTreeMap;
-use std::thread::JoinHandle;
 use std::env;
+use std::thread::JoinHandle;
 
-use backend::{board_setup::models::{Board, FenNotation}, move_generator::models::{PieceType, Color, Moves}, move_register::models::ChessMove, opening_book::OpeningBook};
-use egui::{Ui, ColorImage, Vec2, Color32, Button};
+use backend::{
+    board_setup::models::{Board, FenNotation},
+    move_generator::models::{Color, Moves, PieceType},
+    move_register::models::ChessMove,
+    opening_book::OpeningBook,
+};
+use egui::{Button, Color32, ColorImage, Ui, Vec2};
 use egui_extras::RetainedImage;
 
-use crate::{additions::{new_bg, paint_max_rect}, chess_ui};
+use crate::{
+    additions::{new_bg, paint_max_rect},
+    chess_ui,
+};
 
 const FOR_EXTERNAL_USE: bool = false;
 
@@ -37,7 +45,13 @@ impl Assets {
     pub fn new() -> Self {
         let dir_path = if FOR_EXTERNAL_USE {
             let exe_path = env::current_exe().unwrap();
-            exe_path.parent().unwrap().as_os_str().to_str().unwrap().to_string()
+            exe_path
+                .parent()
+                .unwrap()
+                .as_os_str()
+                .to_str()
+                .unwrap()
+                .to_string()
         } else {
             "src".to_string()
         };
@@ -90,12 +104,21 @@ pub struct ChessGui {
 
 impl ChessGui {
     pub fn new_game(assets: Assets) -> Self {
-        let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into()))
+        let board = Board::try_from(FenNotation(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into(),
+        ))
         .unwrap();
         let legal_moves = Moves::get_all_moves(&board, Color::White);
         let path = if FOR_EXTERNAL_USE {
             let exe_path = env::current_exe().unwrap();
-            exe_path.parent().unwrap().as_os_str().to_str().unwrap().to_string() + "/"
+            exe_path
+                .parent()
+                .unwrap()
+                .as_os_str()
+                .to_str()
+                .unwrap()
+                .to_string()
+                + "/"
         } else {
             "".to_string()
         };
@@ -129,7 +152,10 @@ impl ChessGui {
 
     pub fn reset_game(&mut self) {
         self.bot_thread = None;
-        self.board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
+        self.board = Board::try_from(FenNotation(
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into(),
+        ))
+        .unwrap();
         self.legal_moves = Moves::get_all_moves(&self.board, Color::White);
         self.game_state = GameState::Ongoing;
         self.repetition_map = BTreeMap::from([(self.board.hash_board(), 1)]);
@@ -145,7 +171,7 @@ impl ChessGui {
 
     pub fn ui(&mut self, ui: &mut Ui) {
         let bg = new_bg(ui);
-        
+
         ui.allocate_ui(Vec2::splat(0.), |ui| {
             ui.horizontal(|ui| {
                 ui.add_space(15.5);
@@ -161,10 +187,16 @@ impl ChessGui {
                 ui.vertical(|ui| {
                     ui.allocate_ui(Vec2::new(200., 600.), |ui| {
                         ui.add_space(73.5);
-                        if ui.add_sized(Vec2::new(200., 72.5), Button::new("Reset game")).clicked() {
+                        if ui
+                            .add_sized(Vec2::new(200., 72.5), Button::new("Reset game"))
+                            .clicked()
+                        {
                             self.reset_game();
                         }
-                        if ui.add_sized(Vec2::new(200., 72.5), Button::new("Reverse view")).clicked() {
+                        if ui
+                            .add_sized(Vec2::new(200., 72.5), Button::new("Reverse view"))
+                            .clicked()
+                        {
                             self.reverse_view();
                         }
                         self.game_state.show(ui, self.board.turn);
@@ -178,10 +210,16 @@ impl ChessGui {
                         } else {
                             "Toggle bot for Black (off)"
                         };
-                        if ui.add_sized(Vec2::new(200., 72.5), Button::new(button_text_bot_white)).clicked() {
+                        if ui
+                            .add_sized(Vec2::new(200., 72.5), Button::new(button_text_bot_white))
+                            .clicked()
+                        {
                             self.bot_settings.0 = !self.bot_settings.0;
                         };
-                        if ui.add_sized(Vec2::new(200., 72.5), Button::new(button_text_bot_black)).clicked() {
+                        if ui
+                            .add_sized(Vec2::new(200., 72.5), Button::new(button_text_bot_black))
+                            .clicked()
+                        {
                             self.bot_settings.1 = !self.bot_settings.1;
                         };
                         ui.add_space(73.5);
@@ -222,28 +260,26 @@ pub enum GameState {
 
 impl GameState {
     fn show(&self, ui: &mut Ui, color: Color) {
-        ui.allocate_ui(Vec2::new(200., 148.), |ui| {
-            match self {
-                GameState::Ongoing => {
-                    let bg = new_bg(ui);
-                    ui.centered_and_justified(|ui| {
-                        match color {
-                            Color::White => {
-                                ui.label("White's turn");
-                                paint_max_rect(ui, bg, Color32::WHITE)
-                            },
-                            Color::Black => {
-                                ui.label("Black's turn");
-                                paint_max_rect(ui, bg, Color32::BLACK)
-                            },
-                        };
-                    });
-                },
-                GameState::Done(msg) => {
-                    ui.centered_and_justified(|ui| {
-                        ui.label(msg);
-                    });
-                },
+        ui.allocate_ui(Vec2::new(200., 148.), |ui| match self {
+            GameState::Ongoing => {
+                let bg = new_bg(ui);
+                ui.centered_and_justified(|ui| {
+                    match color {
+                        Color::White => {
+                            ui.label("White's turn");
+                            paint_max_rect(ui, bg, Color32::WHITE)
+                        }
+                        Color::Black => {
+                            ui.label("Black's turn");
+                            paint_max_rect(ui, bg, Color32::BLACK)
+                        }
+                    };
+                });
+            }
+            GameState::Done(msg) => {
+                ui.centered_and_justified(|ui| {
+                    ui.label(msg);
+                });
             }
         });
     }
@@ -259,8 +295,10 @@ impl GameState {
 
 fn load_img(path: &str, name: &str) -> RetainedImage {
     let img = image::open(path).unwrap().to_rgba8();
-    let pixels = img.pixels().map(|x| {
-        [x.0[0], x.0[1], x.0[2], x.0[3]].into_iter()
-    }).flatten().collect::<Vec<u8>>();
+    let pixels = img
+        .pixels()
+        .map(|x| [x.0[0], x.0[1], x.0[2], x.0[3]].into_iter())
+        .flatten()
+        .collect::<Vec<u8>>();
     RetainedImage::from_color_image(name, ColorImage::from_rgba_unmultiplied([60, 60], &pixels))
 }

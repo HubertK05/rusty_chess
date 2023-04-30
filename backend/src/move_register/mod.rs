@@ -1,13 +1,9 @@
-﻿use crate::{
+use crate::{
     board_setup::models::Board,
-    move_generator::{
-        models::{Color, Offset, PieceType, Square, ChessPiece},
-    },
+    move_generator::models::{ChessPiece, Color, Offset, PieceType, Square},
 };
 
-use self::models::{
-    CastleType, MoveError, PromotedPieceType,
-};
+use self::models::{CastleType, MoveError, PromotedPieceType};
 
 pub mod models;
 
@@ -63,7 +59,12 @@ fn en_passant_register_move(from: Square, to: Square, board: &mut Board) -> Resu
     Ok(())
 }
 
-fn promotion_register_move(from: Square, to: Square, to_piece: PromotedPieceType, board: &mut Board) -> Result<(), MoveError> {
+fn promotion_register_move(
+    from: Square,
+    to: Square,
+    to_piece: PromotedPieceType,
+    board: &mut Board,
+) -> Result<(), MoveError> {
     let p = board.take_piece(from)?;
     let new_p = promote_piece(to_piece, to, p.color);
 
@@ -73,7 +74,12 @@ fn promotion_register_move(from: Square, to: Square, to_piece: PromotedPieceType
     Ok(())
 }
 
-fn promotion_capture_register_move(from: Square, to: Square, to_piece: PromotedPieceType, board: &mut Board) -> Result<(), MoveError> {
+fn promotion_capture_register_move(
+    from: Square,
+    to: Square,
+    to_piece: PromotedPieceType,
+    board: &mut Board,
+) -> Result<(), MoveError> {
     let p = board.take_piece(from)?;
     let cap_p = board.take_piece(to)?;
     let new_p = promote_piece(to_piece, to, p.color);
@@ -102,15 +108,27 @@ fn castle_move_register_move(castle_type: CastleType, board: &mut Board) -> Resu
     Ok(())
 }
 
-fn promote_piece(
-    piece_type: PromotedPieceType,
-    position: Square,
-    color: Color,
-) -> ChessPiece {
+fn promote_piece(piece_type: PromotedPieceType, position: Square, color: Color) -> ChessPiece {
     match piece_type {
-        PromotedPieceType::Queen => ChessPiece { piece_type: PieceType::Queen,  color, position },
-        PromotedPieceType::Knight => ChessPiece { piece_type: PieceType::Knight, color, position },
-        PromotedPieceType::Bishop => ChessPiece { piece_type: PieceType::Bishop, color, position },
-        PromotedPieceType::Rook => ChessPiece { piece_type: PieceType::Rook, color, position },
+        PromotedPieceType::Queen => ChessPiece {
+            piece_type: PieceType::Queen,
+            color,
+            position,
+        },
+        PromotedPieceType::Knight => ChessPiece {
+            piece_type: PieceType::Knight,
+            color,
+            position,
+        },
+        PromotedPieceType::Bishop => ChessPiece {
+            piece_type: PieceType::Bishop,
+            color,
+            position,
+        },
+        PromotedPieceType::Rook => ChessPiece {
+            piece_type: PieceType::Rook,
+            color,
+            position,
+        },
     }
 }

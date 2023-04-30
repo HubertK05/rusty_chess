@@ -1,4 +1,7 @@
-use crate::{board_setup::models::Board, move_generator::models::{PieceType, Color, Square}};
+use crate::{
+    board_setup::models::Board,
+    move_generator::models::{Color, PieceType, Square},
+};
 
 pub struct PawnStructure {
     pub white: [u8; 8],
@@ -30,18 +33,30 @@ impl PawnStructure {
     }
 
     pub fn count_doubled_pawns(&self) -> (u8, u8) {
-        (self.white.iter().filter(|&&x| x >= 2).count() as u8, self.black.iter().filter(|&&x| x >= 2).count() as u8)
+        (
+            self.white.iter().filter(|&&x| x >= 2).count() as u8,
+            self.black.iter().filter(|&&x| x >= 2).count() as u8,
+        )
     }
 
     pub fn count_isolated_pawns(&self) -> (u8, u8) {
-        (isolated_pawns_for_side(self.white), isolated_pawns_for_side(self.black))
+        (
+            isolated_pawns_for_side(self.white),
+            isolated_pawns_for_side(self.black),
+        )
     }
 }
 
 fn isolated_pawns_for_side(structure: [u8; 8]) -> u8 {
     let mut ext_structure = [0; 10];
-    structure.into_iter().enumerate().for_each(|(i, val)| ext_structure[i + 1] = val);
-    ext_structure.windows(3).filter(|&x| x[0] == 0 && x[1] != 0 && x[2] == 0).count() as u8
+    structure
+        .into_iter()
+        .enumerate()
+        .for_each(|(i, val)| ext_structure[i + 1] = val);
+    ext_structure
+        .windows(3)
+        .filter(|&x| x[0] == 0 && x[1] != 0 && x[2] == 0)
+        .count() as u8
 }
 
 pub fn get_pawn_weaknesses_from_board(board: &Board) -> (u8, u8, u8, u8) {

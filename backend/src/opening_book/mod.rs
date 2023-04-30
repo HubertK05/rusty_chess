@@ -1,15 +1,15 @@
 pub mod move_parser;
 
-use std::{collections::HashMap, fs::File, io::Read, time::Duration};
 use anyhow::Context;
 use reqwest::{Client, StatusCode};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fs::File, io::Read, time::Duration};
 use thiserror::Error;
 use tokio::time::sleep;
 
-use crate::board_setup::models::{FenNotation, Board};
+use crate::board_setup::models::{Board, FenNotation};
 
-use self::move_parser::{MoveParseError, parse_move};
+use self::move_parser::{parse_move, MoveParseError};
 
 const MIN_MOVE_POPULARITY: u32 = 2000;
 
@@ -41,20 +41,38 @@ pub struct MoveDescription {
 }
 
 #[async_recursion::async_recursion]
-pub async fn get_opening_book(book: &mut OpeningBook, fen: FenNotation) -> Result<(), OpeningBookError> {
+pub async fn get_opening_book(
+    book: &mut OpeningBook,
+    fen: FenNotation,
+) -> Result<(), OpeningBookError> {
     let client = Client::new();
 
     sleep(Duration::from_secs(1)).await;
-    let mut res = client.get(&format!("https://explorer.lichess.ovh/masters?moves=10&topGames=0&fen={fen}")).send().await.context("Request failed")?;
+    let mut res = client
+        .get(&format!(
+            "https://explorer.lichess.ovh/masters?moves=10&topGames=0&fen={fen}"
+        ))
+        .send()
+        .await
+        .context("Request failed")?;
     println!("{:?}", res);
     let mut time_limit = res.status() == StatusCode::TOO_MANY_REQUESTS;
     while time_limit {
         sleep(Duration::from_secs(61)).await;
-        res = client.get(&format!("https://explorer.lichess.ovh/masters?moves=10&topGames=0&fen={fen}")).send().await.context("Request failed")?;
+        res = client
+            .get(&format!(
+                "https://explorer.lichess.ovh/masters?moves=10&topGames=0&fen={fen}"
+            ))
+            .send()
+            .await
+            .context("Request failed")?;
         println!("{:?}", res);
         time_limit = res.status() == StatusCode::TOO_MANY_REQUESTS;
     }
-    let desc = res.json::<PositionDescription>().await.context("Deserialization failed")?;
+    let desc = res
+        .json::<PositionDescription>()
+        .await
+        .context("Deserialization failed")?;
 
     let draw_fen = fen.to_draw_fen();
 
@@ -62,14 +80,19 @@ pub async fn get_opening_book(book: &mut OpeningBook, fen: FenNotation) -> Resul
         let popularity = played_move.white + played_move.draws + played_move.black;
         if popularity >= MIN_MOVE_POPULARITY {
             println!("{}", played_move.san);
-            book.0.entry(draw_fen.clone()).and_modify(|x| x.push((played_move.san.clone(), popularity))).or_insert(vec![(played_move.san.clone(), popularity)]);
+            book.0
+                .entry(draw_fen.clone())
+                .and_modify(|x| x.push((played_move.san.clone(), popularity)))
+                .or_insert(vec![(played_move.san.clone(), popularity)]);
             let played_move = parse_move(fen.clone(), played_move.san)?;
             let mut board = Board::try_from(fen.clone()).context("wrong fen")?;
-            board.register_move(played_move).expect("failed to register move");
+            board
+                .register_move(played_move)
+                .expect("failed to register move");
             let new_fen = FenNotation::try_from(&board).context("cannot create fen from board")?;
             get_opening_book(book, new_fen).await?;
         }
-    };
+    }
 
     Ok(())
 }

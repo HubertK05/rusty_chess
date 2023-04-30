@@ -1,13 +1,18 @@
 use crate::{
-    board_setup::models::{Board, BoardError, FenPieceType}, move_register::models::{ChessMove, PromotedPieceType, MoveType, RawMoveType},
+    board_setup::models::{Board, BoardError, FenPieceType},
+    move_register::models::{ChessMove, MoveType, PromotedPieceType, RawMoveType},
 };
 use std::{
     collections::{HashMap, HashSet},
-    fmt::{self, Display, Debug},
+    fmt::{self, Debug, Display},
     ops::{Add, Mul, Sub},
 };
 
-use super::{restrictions::{get_attacked, get_checked, get_pins}, pawn_get_moves, knight_get_moves, bishop_get_moves, rook_get_moves, queen_get_moves, king_get_moves};
+use super::{
+    bishop_get_moves, king_get_moves, knight_get_moves, pawn_get_moves, queen_get_moves,
+    restrictions::{get_attacked, get_checked, get_pins},
+    rook_get_moves,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PieceType {
@@ -214,7 +219,7 @@ impl ChessPiece {
             PieceType::King => king_get_moves(self, board, restriction).collect(),
         }
     }
-    
+
     pub fn fen_piece_type(&self) -> FenPieceType {
         match (self.piece_type, self.color) {
             (PieceType::Pawn, Color::White) => FenPieceType::WhitePawn,
@@ -231,11 +236,11 @@ impl ChessPiece {
             (PieceType::King, Color::Black) => FenPieceType::BlackKing,
         }
     }
-    
+
     pub fn set_position(&mut self, pos: Square) {
         self.position = pos;
     }
-    
+
     pub fn mating_material_points(&self) -> u8 {
         match self.piece_type {
             PieceType::Pawn => 3,
@@ -291,49 +296,108 @@ impl Moves {
     }
 
     pub fn search_with_from(&self, from: Square) -> Self {
-        Self(self.0.iter().copied().filter(|mov| mov.from == from).collect())
+        Self(
+            self.0
+                .iter()
+                .copied()
+                .filter(|mov| mov.from == from)
+                .collect(),
+        )
     }
 
     pub fn search_with_from_file(&self, from_file: i8) -> Self {
-        Self(self.0.iter().copied().filter(|mov| mov.from.0 == from_file).collect())
+        Self(
+            self.0
+                .iter()
+                .copied()
+                .filter(|mov| mov.from.0 == from_file)
+                .collect(),
+        )
     }
 
     pub fn search_with_from_rank(&self, from_rank: i8) -> Self {
-        Self(self.0.iter().copied().filter(|mov| mov.from.1 == from_rank).collect())
+        Self(
+            self.0
+                .iter()
+                .copied()
+                .filter(|mov| mov.from.1 == from_rank)
+                .collect(),
+        )
     }
 
     pub fn search_with_to(&self, to: Square) -> Self {
         Self(self.0.iter().copied().filter(|mov| mov.to == to).collect())
     }
-    
+
     pub fn search_with_piece_type(&self, piece_type: PieceType) -> Self {
-        Self(self.0.iter().copied().filter(|&mov| match mov.move_type {
-            MoveType::Move(pt) | MoveType::Capture(pt) => piece_type == pt,
-            MoveType::EnPassantMove | MoveType::PromotionMove(_) | MoveType::PromotionCapture(_) => piece_type == PieceType::Pawn,
-            MoveType::CastleMove(_) => piece_type == PieceType::King,
-        }).collect())
+        Self(
+            self.0
+                .iter()
+                .copied()
+                .filter(|&mov| match mov.move_type {
+                    MoveType::Move(pt) | MoveType::Capture(pt) => piece_type == pt,
+                    MoveType::EnPassantMove
+                    | MoveType::PromotionMove(_)
+                    | MoveType::PromotionCapture(_) => piece_type == PieceType::Pawn,
+                    MoveType::CastleMove(_) => piece_type == PieceType::King,
+                })
+                .collect(),
+        )
     }
 
     pub fn search_with_promoted_piece_type(&self, piece_type: PromotedPieceType) -> Self {
-        Self(self.0.iter().copied().filter(|&mov| match mov.move_type {
-            MoveType::Move(_) | MoveType::Capture(_) | MoveType::EnPassantMove | MoveType::CastleMove(_) => false,
-            MoveType::PromotionMove(ppt) | MoveType::PromotionCapture(ppt) => ppt == piece_type,
-        }).collect())
+        Self(
+            self.0
+                .iter()
+                .copied()
+                .filter(|&mov| match mov.move_type {
+                    MoveType::Move(_)
+                    | MoveType::Capture(_)
+                    | MoveType::EnPassantMove
+                    | MoveType::CastleMove(_) => false,
+                    MoveType::PromotionMove(ppt) | MoveType::PromotionCapture(ppt) => {
+                        ppt == piece_type
+                    }
+                })
+                .collect(),
+        )
     }
 
     pub fn search_with_raw_move_types(&self, move_types: &[RawMoveType]) -> Self {
-        Self(self.0.iter().copied().filter(|&mov| match mov.move_type {
-            MoveType::Move(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::Move),
-            MoveType::Capture(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::Capture),
-            MoveType::EnPassantMove => move_types.iter().any(|&move_type| move_type == RawMoveType::EnPassantMove),
-            MoveType::CastleMove(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::CastleMove),
-            MoveType::PromotionMove(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::PromotionMove),
-            MoveType::PromotionCapture(_) => move_types.iter().any(|&move_type| move_type == RawMoveType::PromotionCapture),
-        }).collect())
+        Self(
+            self.0
+                .iter()
+                .copied()
+                .filter(|&mov| match mov.move_type {
+                    MoveType::Move(_) => move_types
+                        .iter()
+                        .any(|&move_type| move_type == RawMoveType::Move),
+                    MoveType::Capture(_) => move_types
+                        .iter()
+                        .any(|&move_type| move_type == RawMoveType::Capture),
+                    MoveType::EnPassantMove => move_types
+                        .iter()
+                        .any(|&move_type| move_type == RawMoveType::EnPassantMove),
+                    MoveType::CastleMove(_) => move_types
+                        .iter()
+                        .any(|&move_type| move_type == RawMoveType::CastleMove),
+                    MoveType::PromotionMove(_) => move_types
+                        .iter()
+                        .any(|&move_type| move_type == RawMoveType::PromotionMove),
+                    MoveType::PromotionCapture(_) => move_types
+                        .iter()
+                        .any(|&move_type| move_type == RawMoveType::PromotionCapture),
+                })
+                .collect(),
+        )
     }
 
     pub fn find(&self, from: Square, to: Square) -> Option<ChessMove> {
-        self.0.iter().copied().filter(|mov| mov.from == from && mov.to == to).next()
+        self.0
+            .iter()
+            .copied()
+            .filter(|mov| mov.from == from && mov.to == to)
+            .next()
     }
 }
 

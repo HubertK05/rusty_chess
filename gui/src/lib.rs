@@ -1,11 +1,16 @@
-pub mod models;
 pub mod additions;
+pub mod models;
 
 use additions::{new_bg, paint_max_rect};
-use backend::{move_generator::models::{Moves, Square, MoveRestrictionData, ChessPiece}, chess_bot::choose_move, move_register::models::{ChessMove, MoveError}};
+use backend::{
+    chess_bot::choose_move,
+    move_generator::models::{ChessPiece, MoveRestrictionData, Moves, Square},
+    move_register::models::{ChessMove, MoveError},
+};
 use eframe::epaint::RectShape;
 use egui::{
-    Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape, Ui, Vec2, layers::ShapeIdx,
+    layers::ShapeIdx, Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape,
+    Ui, Vec2,
 };
 use models::{ChessGui, GameState};
 
@@ -54,8 +59,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
         let (outer_rect, _) = ui.allocate_exact_size(Vec2::splat(517.), Sense::hover());
         let inner_rect = outer_rect.shrink2(Vec2::splat(8.));
         ui.allocate_ui_at_rect(inner_rect, |ui| {
-            egui::Grid::new("some id")
-            .show(ui, |ui| {
+            egui::Grid::new("some id").show(ui, |ui| {
                 let mut shapes: Vec<Vec<ShapeIdx>> = Vec::new();
                 let mut rects: Vec<Vec<Rect>> = Vec::new();
                 for i in 0..8 {
@@ -72,7 +76,8 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                         rects[i].push(Rect::NOTHING);
                     }
                 }
-                let mut board_iter: Vec<(usize, [Option<ChessPiece>; 8])> = state.board.board.clone().into_iter().enumerate().collect();
+                let mut board_iter: Vec<(usize, [Option<ChessPiece>; 8])> =
+                    state.board.board.clone().into_iter().enumerate().collect();
                 if state.reversed {
                     board_iter.reverse();
                 };
@@ -84,17 +89,17 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                             rank_iter.reverse();
                         };
                         for (file, sq) in rank_iter.into_iter().enumerate() {
-                            let file_idx = if state.reversed {
-                                7 - file
-                            } else {
-                                file
-                            };
+                            let file_idx = if state.reversed { 7 - file } else { file };
 
                             let ui = &mut uis[file];
                             let response = board_square(ui, |ui| {
                                 ui.set_min_size(Vec2::new(60., 60.));
                                 ui.set_max_size(Vec2::new(60., 60.));
-                                paint_max_rect(ui, shapes[rank_idx][file_idx], Color32::TRANSPARENT);
+                                paint_max_rect(
+                                    ui,
+                                    shapes[rank_idx][file_idx],
+                                    Color32::TRANSPARENT,
+                                );
                                 rects[rank_idx][file_idx] = ui.max_rect();
                                 ui.centered_and_justified(|ui| {
                                     let piece_id = id_source.with(rank_idx).with(file);
@@ -119,15 +124,23 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                     });
                     ui.end_row();
                 }
-                
-                let legal_destinations = source_sq.map(|sq| state.legal_moves.search_with_from(Square(sq.0 as i8, sq.1 as i8)));
+
+                let legal_destinations = source_sq.map(|sq| {
+                    state
+                        .legal_moves
+                        .search_with_from(Square(sq.0 as i8, sq.1 as i8))
+                });
 
                 for rank in 0..8 {
                     for file in 0..8 {
                         let color = {
                             if let Some(destinations) = &legal_destinations {
-                                let Moves(filtered_moves) = destinations.search_with_to(Square(file as i8, rank as i8));
-                                if filtered_moves.len() != 0 && state.bot_thread.is_none() && !state.get_bot_settings(state.board.turn) {
+                                let Moves(filtered_moves) =
+                                    destinations.search_with_to(Square(file as i8, rank as i8));
+                                if filtered_moves.len() != 0
+                                    && state.bot_thread.is_none()
+                                    && !state.get_bot_settings(state.board.turn)
+                                {
                                     LEGAL_MOVE_SQUARE_COLOR
                                 } else if (file + rank) % 2 == 0 {
                                     BLACK_SQUARE_COLOR
@@ -141,29 +154,41 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                             }
                         };
 
-                        ui.painter().set(shapes[rank][file], RectShape {
-                            rect: rects[rank][file],
-                            rounding: ui.visuals().widgets.inactive.rounding,
-                            fill: color,
-                            stroke: ui.visuals().widgets.inactive.bg_stroke,
-                        });
+                        ui.painter().set(
+                            shapes[rank][file],
+                            RectShape {
+                                rect: rects[rank][file],
+                                rounding: ui.visuals().widgets.inactive.rounding,
+                                fill: color,
+                                stroke: ui.visuals().widgets.inactive.bg_stroke,
+                            },
+                        );
                     }
                 }
             });
         });
     });
 
-    if state.game_state.is_ongoing() && state.bot_thread.is_none() && !state.get_bot_settings(state.board.turn) {
+    if state.game_state.is_ongoing()
+        && state.bot_thread.is_none()
+        && !state.get_bot_settings(state.board.turn)
+    {
         if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
             if ui.input(|i| i.pointer.any_released()) {
-                if let Some(chosen_move) = state.legal_moves.find(Square(drag_file as i8, drag_rank as i8), Square(drop_file as i8, drop_rank as i8)) {
+                if let Some(chosen_move) = state.legal_moves.find(
+                    Square(drag_file as i8, drag_rank as i8),
+                    Square(drop_file as i8, drop_rank as i8),
+                ) {
                     play_move(state, chosen_move).expect("oops, couldn't play the move");
                 }
             }
         }
     }
 
-    if state.game_state.is_ongoing() && state.get_bot_settings(state.board.turn) && state.bot_thread.is_none() {
+    if state.game_state.is_ongoing()
+        && state.get_bot_settings(state.board.turn)
+        && state.bot_thread.is_none()
+    {
         let board = state.board;
         let rep_map = state.repetition_map.clone();
         let book = state.book.clone();
@@ -197,21 +222,29 @@ fn play_move(state: &mut ChessGui, chosen_move: ChessMove) -> Result<(), MoveErr
 
 fn check_game_rules(state: &mut ChessGui) {
     state.gen_legal_moves_from_pos(state.board.turn);
-    let position_count = *state.repetition_map.entry(state.board.hash_board()).and_modify(|x| *x += 1).or_insert(1);
+    let position_count = *state
+        .repetition_map
+        .entry(state.board.hash_board())
+        .and_modify(|x| *x += 1)
+        .or_insert(1);
     if state.board.half_move_timer_50 > 100 {
         state.game_state = GameState::Done("Draw by the 50 move rule".into());
-    }
-    else if state.board.mating_material.0 < 3 && state.board.mating_material.1 < 3 {
+    } else if state.board.mating_material.0 < 3 && state.board.mating_material.1 < 3 {
         state.game_state = GameState::Done("Draw by insufficitent mating material".into());
-    }
-    else if state.legal_moves.0.is_empty() {
-        if MoveRestrictionData::get(&state.board, state.board.turn).check_squares.checks_amount != 0 {
-            state.game_state = GameState::Done(format!("{} wins by checkmate", state.board.turn.opp().to_string()));
+    } else if state.legal_moves.0.is_empty() {
+        if MoveRestrictionData::get(&state.board, state.board.turn)
+            .check_squares
+            .checks_amount
+            != 0
+        {
+            state.game_state = GameState::Done(format!(
+                "{} wins by checkmate",
+                state.board.turn.opp().to_string()
+            ));
         } else {
             state.game_state = GameState::Done("Draw by stalemate".into());
         }
-    }
-    else if position_count >= 3 {
+    } else if position_count >= 3 {
         state.game_state = GameState::Done("Draw by threefold repetition".into());
     }
 }

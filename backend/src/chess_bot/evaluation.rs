@@ -1,4 +1,8 @@
-use std::{ops::{Add, AddAssign, Sub, SubAssign}, cmp::Ordering, fmt::Display};
+use std::{
+    cmp::Ordering,
+    fmt::Display,
+    ops::{Add, AddAssign, Sub, SubAssign},
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Evaluation {
@@ -11,7 +15,11 @@ pub struct Evaluation {
 
 impl Evaluation {
     pub fn total(self) -> i32 {
-        self.material as i32 + self.pst as i32 + self.pawn_structure as i32 + self.space as i32 + self.king_dist as i32
+        self.material as i32
+            + self.pst as i32
+            + self.pawn_structure as i32
+            + self.space as i32
+            + self.king_dist as i32
     }
 
     pub fn new() -> Self {
@@ -48,22 +56,6 @@ impl Evaluation {
         pawn_structure: -32768,
         space: -32768,
         king_dist: -32768,
-    };
-
-    pub const MAX_MATERIAL: Self = Evaluation {
-        material: 32767,
-        pst: 0,
-        pawn_structure: 0,
-        space: 0,
-        king_dist: 0,
-    };
-
-    pub const MIN_MATERIAL: Self = Evaluation {
-        material: -32768,
-        pst: 0,
-        pawn_structure: 0,
-        space: 0,
-        king_dist: 0,
     };
 }
 

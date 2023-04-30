@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
     board_setup::models::Board,
-    move_register::models::{MoveType, ChessMove},
+    move_register::models::{ChessMove, MoveType},
 };
 
 use super::{
@@ -119,7 +119,7 @@ pub fn get_checked(board: &Board, color: Color) -> CheckSquares {
                     if let Some(sq) = elem {
                         res.squares.insert(sq);
                     };
-                };
+                }
                 res.checks_amount += 1;
             };
             break;
@@ -253,10 +253,7 @@ fn attack_condition(offset: Offset, color: Color, piece: PieceType) -> bool {
     }
 }
 
-pub fn filter_with_checked(
-    moves: Vec<ChessMove>,
-    checked: &CheckSquares,
-) -> Vec<ChessMove> {
+pub fn filter_with_checked(moves: Vec<ChessMove>, checked: &CheckSquares) -> Vec<ChessMove> {
     match checked.checks_amount {
         0 => moves,
         1 => moves
@@ -274,10 +271,7 @@ pub fn filter_with_checked(
     }
 }
 
-pub fn filter_with_pins(
-    moves: Vec<ChessMove>,
-    pins: &PinSquares,
-) -> Vec<ChessMove> {
+pub fn filter_with_pins(moves: Vec<ChessMove>, pins: &PinSquares) -> Vec<ChessMove> {
     moves
         .into_iter()
         .filter(|x| {

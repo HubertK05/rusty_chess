@@ -1,7 +1,13 @@
-use crate::{move_generator::models::{PieceType, Square}, board_setup::models::Board};
+use crate::{
+    board_setup::models::Board,
+    move_generator::models::{PieceType, Square},
+};
 use std::fmt::{self, Display};
 
-use super::{move_register_move, capture_register_move, en_passant_register_move, promotion_register_move, promotion_capture_register_move, castle_move_register_move};
+use super::{
+    capture_register_move, castle_move_register_move, en_passant_register_move, move_register_move,
+    promotion_capture_register_move, promotion_register_move,
+};
 
 #[derive(Debug, PartialEq)]
 pub enum MoveError {
@@ -59,8 +65,12 @@ impl ChessMove {
             MoveType::Capture(_) => capture_register_move(self.from, self.to, board),
             MoveType::CastleMove(castle_type) => castle_move_register_move(castle_type, board),
             MoveType::EnPassantMove => en_passant_register_move(self.from, self.to, board),
-            MoveType::PromotionMove(to_piece) => promotion_register_move(self.from, self.to, to_piece, board),
-            MoveType::PromotionCapture(to_piece) => promotion_capture_register_move(self.from, self.to, to_piece, board),
+            MoveType::PromotionMove(to_piece) => {
+                promotion_register_move(self.from, self.to, to_piece, board)
+            }
+            MoveType::PromotionCapture(to_piece) => {
+                promotion_capture_register_move(self.from, self.to, to_piece, board)
+            }
         }
     }
 }
@@ -72,11 +82,8 @@ impl Display for ChessMove {
                 let piece_letter = piece;
                 let to_file_letter = (self.to.0 as u8 + 97) as char;
                 let to_rank_number = self.to.1 + 1;
-                write!(
-                    f,
-                    "{piece_letter}{to_file_letter}{to_rank_number}"
-                )
-            },
+                write!(f, "{piece_letter}{to_file_letter}{to_rank_number}")
+            }
             MoveType::Capture(piece) => {
                 let piece_type = piece;
                 let piece_letter = if piece_type == PieceType::Pawn {
@@ -86,30 +93,25 @@ impl Display for ChessMove {
                 };
                 let to_file_letter = (self.to.0 as u8 + 97) as char;
                 let to_rank_number = self.to.1 + 1;
-                write!(
-                    f,
-                    "{piece_letter}x{to_file_letter}{to_rank_number}"
-                )
-            },
-            MoveType::CastleMove(_) => {
-                match self.to.0 {
-                    2 => write!(f, "O-O-O"),
-                    6 => write!(f, "O-O"),
-                    _ => unreachable!(),
-                }
+                write!(f, "{piece_letter}x{to_file_letter}{to_rank_number}")
+            }
+            MoveType::CastleMove(_) => match self.to.0 {
+                2 => write!(f, "O-O-O"),
+                6 => write!(f, "O-O"),
+                _ => unreachable!(),
             },
             MoveType::EnPassantMove => {
                 let from_file_letter = (self.from.0 as u8 + 97) as char;
                 let to_file_letter = (self.to.0 as u8 + 97) as char;
                 let to_rank_number = self.to.1 + 1;
                 write!(f, "{from_file_letter}x{to_file_letter}{to_rank_number}")
-            },
+            }
             MoveType::PromotionMove(piece) => {
                 let to_file_letter = (self.to.0 as u8 + 97) as char;
                 let to_rank_number = self.to.1 + 1;
                 let piece_letter = piece;
                 write!(f, "{to_file_letter}{to_rank_number}={piece_letter}")
-            },
+            }
             MoveType::PromotionCapture(piece) => {
                 let from_file_letter = (self.from.0 as u8 + 97) as char;
                 let to_file_letter = (self.to.0 as u8 + 97) as char;
@@ -119,7 +121,7 @@ impl Display for ChessMove {
                     f,
                     "{from_file_letter}x{to_file_letter}{to_rank_number}={piece_letter}"
                 )
-            },
+            }
         }
     }
 }

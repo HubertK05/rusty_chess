@@ -1,7 +1,20 @@
-use std::{collections::{BTreeMap, HashMap}, fs::File, io::Write, thread::{self, JoinHandle, sleep}, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs::File,
+    io::Write,
+    thread::{self, sleep, JoinHandle},
+    time::Duration,
+};
 
 use backend::{
-    board_setup::models::{Board, FenNotation}, move_generator::models::{Moves, Color, PieceType, Square, MoveRestrictionData}, move_register::models::{MoveType, ChessMove}, chess_bot::{search_game_tree, search_game_tree_base_case, get_ordered_moves, evaluate_chg, is_endgame, is_attacked_by_pawn, choose_move}, opening_book::{get_opening_book, OpeningBook},
+    board_setup::models::{Board, FenNotation},
+    chess_bot::{
+        choose_move, get_ordered_moves, is_endgame,
+        piece_tables::evaluate_chg, search_game_tree,
+    },
+    move_generator::models::{MoveRestrictionData, Moves, PieceType, Square},
+    move_register::models::{ChessMove, MoveType},
+    opening_book::{get_opening_book, OpeningBook},
 };
 use easybench::bench;
 
@@ -18,9 +31,7 @@ fn main() {
         thread: Option<JoinHandle<ChessMove>>,
     }
 
-    let mut bot = OptionThread {
-        thread: None,
-    };
+    let mut bot = OptionThread { thread: None };
 
     loop {
         if bot.thread.is_none() {
@@ -36,7 +47,9 @@ fn main() {
         if let Some(th) = thread {
             if th.is_finished() {
                 let played_move = th.join().expect("join error");
-                board.register_move(played_move).expect("failed to register the move");
+                board
+                    .register_move(played_move)
+                    .expect("failed to register the move");
                 println!("Board state (game {game_counter}):\n{}", board);
                 if is_completed(&board, &mut rep_map) {
                     board = Board::new_game();
@@ -50,7 +63,6 @@ fn main() {
                 bot.thread = Some(th);
             }
         }
-        
     }
 
     if DO_BENCHMARKS {
@@ -63,21 +75,25 @@ fn main() {
 
 fn is_completed(board: &Board, rep_map: &mut BTreeMap<u64, u8>) -> bool {
     let legal_moves = Moves::get_all_moves(board, board.turn);
-    let position_count = *rep_map.entry(board.hash_board()).and_modify(|x| *x += 1).or_insert(1);
+    let position_count = *rep_map
+        .entry(board.hash_board())
+        .and_modify(|x| *x += 1)
+        .or_insert(1);
     if board.half_move_timer_50 > 100 {
         return true;
-    }
-    else if board.mating_material.0 < 3 && board.mating_material.1 < 3 {
+    } else if board.mating_material.0 < 3 && board.mating_material.1 < 3 {
         return true;
-    }
-    else if legal_moves.0.is_empty() {
-        if MoveRestrictionData::get(board, board.turn).check_squares.checks_amount != 0 {
+    } else if legal_moves.0.is_empty() {
+        if MoveRestrictionData::get(board, board.turn)
+            .check_squares
+            .checks_amount
+            != 0
+        {
             return true;
         } else {
             return true;
         }
-    }
-    else if position_count >= 3 {
+    } else if position_count >= 3 {
         return true;
     } else {
         false
@@ -85,52 +101,49 @@ fn is_completed(board: &Board, rep_map: &mut BTreeMap<u64, u8>) -> bool {
 }
 
 fn do_benchmarks() {
-    let board = Board::try_from(FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).unwrap();
+    let board = Board::try_from(FenNotation(
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into(),
+    ))
+    .unwrap();
     let mut rep_map = BTreeMap::new();
-    let Moves(moves) = Moves::get_all_moves(&board, board.turn);
-    let test_move = ChessMove { move_type: MoveType::Move(PieceType::Pawn), from: Square(4, 1), to: Square(4, 3) };
+    let Moves(_moves) = Moves::get_all_moves(&board, board.turn);
+    let test_move = ChessMove {
+        move_type: MoveType::Move(PieceType::Pawn),
+        from: Square(4, 1),
+        to: Square(4, 3),
+    };
 
-    println!("eval chg - {}", bench(|| evaluate_chg(&board, test_move, is_endgame(&board))));
-    println!("score move - {}", bench(|| {
-        let mov = &test_move;
-
-        let positional_chg = match board.turn {
-            Color::White => -evaluate_chg(&board, *mov, is_endgame(&board)),
-            Color::Black => evaluate_chg(&board, *mov, is_endgame(&board)),
-        };
-    
-        if is_attacked_by_pawn(&board, test_move.to) {
-            2000 + positional_chg
-        } else {
-            1000 + positional_chg
-        }
-    }));
-    println!("score and order moves - {}", bench(|| {
-        let mut move_set = moves.clone();
-        move_set.sort_by_cached_key(|mov| {
-            let positional_chg = match board.turn {
-                Color::White => -evaluate_chg(&board, *mov, is_endgame(&board)),
-                Color::Black => evaluate_chg(&board, *mov, is_endgame(&board)),
-            };
-
-            if is_attacked_by_pawn(&board, mov.to) {
-                2000 + positional_chg
-            } else {
-                1000 + positional_chg
-            }
-        });
-        move_set
-    }));
-    println!("search to depth 2 - {}", bench(|| search_game_tree(&board, 0, 2, i32::MIN, board.hash_board(), &mut rep_map)));
-    println!("last depth search - {}", bench(|| search_game_tree_base_case(moves.clone(), &board, i32::MIN, board.hash_board(), &mut rep_map)));
-    println!("get unordered moves - {}", bench(|| Moves::get_all_moves(&board, board.turn)));
-    println!("get ordered moves - {}", bench(|| get_ordered_moves(&board)));
+    println!(
+        "eval chg - {}",
+        bench(|| evaluate_chg(&board, test_move, is_endgame(&board)))
+    );
+    println!(
+        "search to depth 2 - {}",
+        bench(|| search_game_tree(&board, 0, 2, i32::MIN, board.hash_board(), &mut rep_map))
+    );
+    println!(
+        "last depth search - {}",
+        bench(|| search_game_tree(&board, 0, 1, i32::MIN, board.hash_board(), &mut rep_map))
+    );
+    println!(
+        "get unordered moves - {}",
+        bench(|| Moves::get_all_moves(&board, board.turn))
+    );
+    println!(
+        "get ordered moves - {}",
+        bench(|| get_ordered_moves(&board))
+    );
 }
 
 async fn create_opening_book() {
     let mut file = File::create("opening_book.txt").unwrap();
     let mut book = OpeningBook(HashMap::new());
-    get_opening_book(&mut book, FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into())).await.unwrap();
+    get_opening_book(
+        &mut book,
+        FenNotation("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".into()),
+    )
+    .await
+    .unwrap();
     // println!("{:#?}", book);
 
     let book_json = serde_json::to_string(&book).unwrap();

@@ -1,4 +1,4 @@
-﻿use std::thread;
+use std::thread;
 
 use backend::{
     board_setup::models::{Board, FenNotation},
@@ -23,15 +23,25 @@ fn start_test(board: &Board, max_depth: u8) -> (u64, u64, u64, u64) {
                 let mut another_board = new_board;
                 (&mut another_board).register_move(elem).unwrap();
                 let part_res = test_count_moves(&another_board, 1, max_depth);
-                res = (res.0 + part_res.0, res.1 + part_res.1, res.2 + part_res.2, res.3 + part_res.3);
-            };
+                res = (
+                    res.0 + part_res.0,
+                    res.1 + part_res.1,
+                    res.2 + part_res.2,
+                    res.3 + part_res.3,
+                );
+            }
             res
         });
         threads.push(part_res);
     }
     for elem in threads {
         let part_res = elem.join().unwrap();
-        res = (res.0 + part_res.0, res.1 + part_res.1, res.2 + part_res.2, res.3 + part_res.3);
+        res = (
+            res.0 + part_res.0,
+            res.1 + part_res.1,
+            res.2 + part_res.2,
+            res.3 + part_res.3,
+        );
     }
     res
 }
@@ -39,20 +49,34 @@ fn start_test(board: &Board, max_depth: u8) -> (u64, u64, u64, u64) {
 fn test_count_moves(board: &Board, depth: u8, max_depth: u8) -> (u64, u64, u64, u64) {
     let move_set = Moves::get_all_moves(&board, board.turn);
     if depth == max_depth - 1 {
-        let en_passants = move_set.0.iter().filter(|&x| x.move_type == MoveType::EnPassantMove).count();
-        let castles = move_set.0.iter().filter(|&x| if let MoveType::CastleMove(_) = x.move_type {
-            true
-        } else {
-            false
-        }).count();
-        let promotions = move_set.0.iter().filter(|&x| match x.move_type {
-            MoveType::Move(_) => false,
-            MoveType::Capture(_) => false,
-            MoveType::EnPassantMove => false,
-            MoveType::CastleMove(_) => false,
-            MoveType::PromotionMove(_) => true,
-            MoveType::PromotionCapture(_) => true,
-        }).count();
+        let en_passants = move_set
+            .0
+            .iter()
+            .filter(|&x| x.move_type == MoveType::EnPassantMove)
+            .count();
+        let castles = move_set
+            .0
+            .iter()
+            .filter(|&x| {
+                if let MoveType::CastleMove(_) = x.move_type {
+                    true
+                } else {
+                    false
+                }
+            })
+            .count();
+        let promotions = move_set
+            .0
+            .iter()
+            .filter(|&x| match x.move_type {
+                MoveType::Move(_) => false,
+                MoveType::Capture(_) => false,
+                MoveType::EnPassantMove => false,
+                MoveType::CastleMove(_) => false,
+                MoveType::PromotionMove(_) => true,
+                MoveType::PromotionCapture(_) => true,
+            })
+            .count();
         return (
             move_set.0.len() as u64,
             en_passants as u64,
@@ -73,7 +97,9 @@ fn test_count_moves(board: &Board, depth: u8, max_depth: u8) -> (u64, u64, u64, 
             }
             test_count_moves(&new_board, depth + 1, max_depth)
         })
-        .fold((0, 0, 0, 0), |a, b| (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3))
+        .fold((0, 0, 0, 0), |a, b| {
+            (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3)
+        })
 }
 
 #[test]
