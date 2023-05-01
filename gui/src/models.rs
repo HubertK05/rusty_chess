@@ -8,7 +8,7 @@ use backend::{
     move_register::models::ChessMove,
     opening_book::OpeningBook, config::AppSettings,
 };
-use egui::{Button, Color32, ColorImage, Ui, Vec2};
+use egui::{Button, Color32, ColorImage, Ui, Vec2, Context};
 use egui_extras::RetainedImage;
 
 use crate::{
@@ -101,6 +101,14 @@ pub struct ChessGui {
     pub bot_settings: (bool, bool),
     pub book: OpeningBook,
     pub ext_settings: AppSettings,
+    pub promotion_popup: Option<PromotionPopup>,
+}
+
+#[derive(Clone, Copy)]
+pub struct PromotionPopup {
+    pub chosen_move: ChessMove,
+    pub color: Color,
+    pub reversed: bool,
 }
 
 impl ChessGui {
@@ -135,6 +143,7 @@ impl ChessGui {
             bot_settings: (false, false),
             book: OpeningBook::from_file(&(path.clone() + "opening_book.txt")),
             ext_settings: AppSettings::get_from_file(&(path + "config/settings.toml")).expect("failed to get settings"),
+            promotion_popup: None,
         }
     }
 
@@ -150,6 +159,7 @@ impl ChessGui {
             bot_settings: (false, false),
             book: OpeningBook::from_file("opening_book.txt"),
             ext_settings: AppSettings::get_from_file("./config/settings.toml").expect("failed to get settings"),
+            promotion_popup: None,
         }
     }
 
@@ -162,17 +172,21 @@ impl ChessGui {
         self.legal_moves = Moves::get_all_moves(&self.board, Color::White);
         self.game_state = GameState::Ongoing;
         self.repetition_map = BTreeMap::from([(self.board.hash_board(), 1)]);
+        self.promotion_popup = None;
     }
 
     pub fn reverse_view(&mut self) {
-        self.reversed = !self.reversed
+        self.reversed = !self.reversed;
+        if let Some(popup) = &mut self.promotion_popup {
+            popup.reversed = !popup.reversed;
+        }
     }
 
     pub fn gen_legal_moves_from_pos(&mut self, color: Color) {
         self.legal_moves = Moves::get_all_moves(&self.board, color);
     }
 
-    pub fn ui(&mut self, ui: &mut Ui) {
+    pub fn ui(&mut self, ui: &mut Ui, ctx: &Context) {
         let bg = new_bg(ui);
 
         ui.allocate_ui(Vec2::splat(0.), |ui| {
@@ -182,7 +196,7 @@ impl ChessGui {
                 ui.vertical(|ui| {
                     ui.add_space(40.);
                     ui.allocate_ui(Vec2::splat(0.), |ui| {
-                        chess_ui(self, ui);
+                        chess_ui(self, ui, ctx);
                     });
                     ui.add_space(40.);
                 });
@@ -218,12 +232,14 @@ impl ChessGui {
                             .clicked()
                         {
                             self.bot_settings.0 = !self.bot_settings.0;
+                            self.promotion_popup = None;
                         };
                         if ui
                             .add_sized(Vec2::new(200., 72.5), Button::new(button_text_bot_black))
                             .clicked()
                         {
                             self.bot_settings.1 = !self.bot_settings.1;
+                            self.promotion_popup = None;
                         };
                         ui.add_space(73.5);
                     });
@@ -248,7 +264,7 @@ impl eframe::App for ChessGui {
             ui.spacing_mut().item_spacing = Vec2::new(3., 3.);
             ui.scope(|ui| {
                 ui.set_max_size(Vec2::splat(600.));
-                self.ui(ui);
+                self.ui(ui, ctx);
             });
         });
         ctx.request_repaint();

@@ -4,15 +4,15 @@ pub mod models;
 use additions::{new_bg, paint_max_rect};
 use backend::{
     chess_bot::choose_move,
-    move_generator::models::{ChessPiece, MoveRestrictionData, Moves, Square},
-    move_register::models::{ChessMove, MoveError},
+    move_generator::models::{ChessPiece, MoveRestrictionData, Moves, Square, Color},
+    move_register::models::{ChessMove, MoveError, MoveType, PromotedPieceType},
 };
 use eframe::epaint::RectShape;
 use egui::{
     layers::ShapeIdx, Color32, CursorIcon, Id, InnerResponse, LayerId, Order, Rect, Sense, Shape,
-    Ui, Vec2,
+    Ui, Vec2, Pos2, ImageButton, Context, Button,
 };
-use models::{ChessGui, GameState};
+use models::{ChessGui, GameState, PromotionPopup};
 
 const LEGAL_MOVE_SQUARE_COLOR: Color32 = Color32::from_rgb(128, 0, 0);
 const BLACK_SQUARE_COLOR: Color32 = Color32::from_rgb(120, 64, 0);
@@ -50,7 +50,7 @@ fn board_square<R>(ui: &mut Ui, body: impl FnOnce(&mut Ui) -> R) -> InnerRespons
     InnerResponse::new(ret, response)
 }
 
-fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
+fn chess_ui(state: &mut ChessGui, ui: &mut Ui, ctx: &Context) {
     let id_source = Id::new("piece id");
     let mut source_sq: Option<(usize, usize)> = None;
     let mut drop_sq: Option<(usize, usize)> = None;
@@ -140,6 +140,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                                 if filtered_moves.len() != 0
                                     && state.bot_thread.is_none()
                                     && !state.get_bot_settings(state.board.turn)
+                                    && state.promotion_popup.is_none()
                                 {
                                     LEGAL_MOVE_SQUARE_COLOR
                                 } else if (file + rank) % 2 == 0 {
@@ -172,6 +173,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
     if state.game_state.is_ongoing()
         && state.bot_thread.is_none()
         && !state.get_bot_settings(state.board.turn)
+        && state.promotion_popup.is_none()
     {
         if let (Some((drag_file, drag_rank)), Some((drop_file, drop_rank))) = (source_sq, drop_sq) {
             if ui.input(|i| i.pointer.any_released()) {
@@ -179,9 +181,88 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
                     Square(drag_file as i8, drag_rank as i8),
                     Square(drop_file as i8, drop_rank as i8),
                 ) {
-                    play_move(state, chosen_move).expect("oops, couldn't play the move");
+                    if is_promotion(chosen_move) {
+                        state.promotion_popup = Some(
+                            PromotionPopup {
+                                chosen_move,
+                                color: state.board.turn,
+                                reversed: is_promotion_reversed(state.reversed, chosen_move.to.1),
+                            }
+                        );
+                    } else {
+                        play_move(state, chosen_move).expect("oops, couldn't play the move");
+                    }
                 }
             }
+        }
+    }
+
+    if let Some(popup) = &state.promotion_popup {
+        let base_offset = Vec2::new(0., 60. + ui.spacing().item_spacing.y);
+        let (starting_y_pos, base_offset) = if popup.reversed {
+            (497., -base_offset)
+        } else {
+            (56., base_offset)
+        };
+        let display_at_file = if state.reversed {
+            7 - popup.chosen_move.to.0
+        } else {
+            popup.chosen_move.to.0
+        };
+
+        let base_pos = Pos2::new(31.5, starting_y_pos) + Vec2::new((60. + ui.spacing().item_spacing.x) * display_at_file as f32, 0.);
+        
+        let piece_textures = match popup.color {
+            Color::White => (state.assets.wq.texture_id(ctx), state.assets.wr.texture_id(ctx), state.assets.wb.texture_id(ctx), state.assets.wn.texture_id(ctx)),
+            Color::Black => (state.assets.bq.texture_id(ctx), state.assets.br.texture_id(ctx), state.assets.bb.texture_id(ctx), state.assets.bn.texture_id(ctx)),
+        };
+        
+        let inner = if ui.put(
+            Rect::from_min_size(base_pos, Vec2::new(60., 60.)),
+            ImageButton::new(piece_textures.0, Vec2::new(60. - 2. * ui.spacing().button_padding.x, 60. - 2. * ui.spacing().button_padding.x))
+        ).clicked() {
+            PromotionPopupResp::Promote(PromotedPieceType::Queen)
+        } else if ui.put(
+            Rect::from_min_size(base_pos + base_offset, Vec2::new(60., 60.)),
+            ImageButton::new(piece_textures.1, Vec2::new(60. - 2. * ui.spacing().button_padding.x, 60. - 2. * ui.spacing().button_padding.x))
+        ).clicked() {
+            PromotionPopupResp::Promote(PromotedPieceType::Rook)
+        } else if ui.put(
+            Rect::from_min_size(base_pos + 2. * base_offset, Vec2::new(60., 60.)),
+            ImageButton::new(piece_textures.2, Vec2::new(60. - 2. * ui.spacing().button_padding.x, 60. - 2. * ui.spacing().button_padding.x))
+        ).clicked() {
+            PromotionPopupResp::Promote(PromotedPieceType::Bishop)
+        } else if ui.put(
+            Rect::from_min_size(base_pos + 3. * base_offset, Vec2::new(60., 60.)),
+            ImageButton::new(piece_textures.3, Vec2::new(60. - 2. * ui.spacing().button_padding.x, 60. - 2. * ui.spacing().button_padding.x))
+        ).clicked() {
+            PromotionPopupResp::Promote(PromotedPieceType::Knight)
+        } else if ui.put(
+            Rect::from_min_size(base_pos + 4. * base_offset, Vec2::new(60., 60.)),
+            Button::new("X").min_size(Vec2::new(60. - 2. * ui.spacing().button_padding.x, 60. - 2. * ui.spacing().button_padding.x))
+        ).clicked() {
+            PromotionPopupResp::Close
+        } else {
+            PromotionPopupResp::Continue
+        };
+        match inner {
+            PromotionPopupResp::Promote(ppt) => {
+                play_move(
+                    state,
+                    ChessMove {
+                        move_type: match popup.chosen_move.move_type {
+                            MoveType::PromotionMove(_) => MoveType::PromotionMove(ppt),
+                            MoveType::PromotionCapture(_) => MoveType::PromotionCapture(ppt),
+                            _ => unreachable!(),
+                        },
+                        from: popup.chosen_move.from,
+                        to: popup.chosen_move.to,
+                    }
+                ).expect("oops, couldn't play the move");
+                state.promotion_popup = None;
+            },
+            PromotionPopupResp::Close => state.promotion_popup = None,
+            _ => (),
         }
     }
 
@@ -212,7 +293,7 @@ fn chess_ui(state: &mut ChessGui, ui: &mut Ui) {
             state.bot_thread = Some(th)
         }
     }
-    paint_max_rect(ui, bg, Color32::from_rgb(128, 88, 19))
+    paint_max_rect(ui, bg, Color32::from_rgb(128, 88, 19));
 }
 
 fn play_move(state: &mut ChessGui, chosen_move: ChessMove) -> Result<(), MoveError> {
@@ -248,4 +329,21 @@ fn check_game_rules(state: &mut ChessGui) {
     } else if position_count >= 3 {
         state.game_state = GameState::Done("Draw by threefold repetition".into());
     }
+}
+
+fn is_promotion(mov: ChessMove) -> bool {
+    match mov.move_type {
+        MoveType::PromotionMove(_) | MoveType::PromotionCapture(_) => true,
+        _ => false,
+    }
+}
+
+fn is_promotion_reversed(rev: bool, rank: i8) -> bool {
+    (!rev && rank == 0) || (rev && rank == 7)
+}
+
+enum PromotionPopupResp {
+    Promote(PromotedPieceType),
+    Close,
+    Continue,
 }
