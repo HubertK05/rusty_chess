@@ -1,23 +1,42 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
 
+  type BotState = "on" | "off";
+
+  let reversed = false;
+  let botState = "off";
+
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
   }
 </script>
 
 <main>
-  {#each generate_series(8).reverse() as row}
-    <div class="row">
-      {#each generate_series(8) as col}
-        <div class="square">
-          <div class={(row + col) % 2 == 0 ? "light-square" : "dark-square"}>
-            {row + col}
+  <div class="board">
+    {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
+      <div class="row">
+        {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
+          <div class="square">
+            <div class={(row + col) % 2 == 0 ? "light-square" : "dark-square"}>
+              {row + col}
+            </div>
           </div>
-        </div>
-      {/each}
-    </div>
-  {/each}
+        {/each}
+      </div>
+    {/each}
+  </div>
+  <div class="game-options">
+    <button
+      on:click={() => {
+        reversed = !reversed;
+      }}>Reverse board</button
+    >
+    <button
+      on:click={() => {
+        botState = botState === "off" ? "on" : "off";
+      }}>Toggle bot ({botState})</button
+    >
+  </div>
 </main>
 
 <style>
