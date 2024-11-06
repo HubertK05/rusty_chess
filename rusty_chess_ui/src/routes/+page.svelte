@@ -1,21 +1,13 @@
 <script lang="ts">
-  type BotState = "on" | "off";
+  import Square from "../components/Square.svelte";
+  import { board } from "../lib/shared.svelte";
+  
+    type BotState = "on" | "off";
   type Turn = "White" | "Black";
 
   let reversed = false;
   let botState = "off";
   let turn: Turn = "White";
-
-  let board = [
-    ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
-    ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
-    ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
-  ];
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
@@ -23,25 +15,12 @@
 </script>
 
 <main class="flex justify-center items-center h-screen">
-  <div class="flex">
-    <div class="">
-      {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
+  <div class="flex">      
+    <div>
+        {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
         <div class="flex flex-row">
           {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
-            <div
-              class={`
-                  w-16 h-16 flex items-center justify-center
-                  ${(row + col) % 2 === 0 ? "bg-yellow-300" : "bg-orange-800"}
-                `}
-            >
-              {#if board[row][col] !== ""}
-                <img
-                  src={`../src/assets/${board[row][col]}.svg`}
-                  alt="A chess piece"
-                  class="w-full h-full"
-                />
-              {/if}
-            </div>
+            <Square row={row} col={col} />
           {/each}
         </div>
       {/each}
