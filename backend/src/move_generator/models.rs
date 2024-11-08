@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     board_setup::models::{Board, BoardError, FenPieceType},
     move_register::models::{ChessMove, MoveType, PromotedPieceType, RawMoveType},
@@ -14,7 +16,7 @@ use super::{
     rook_get_moves,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PieceType {
     Pawn,
     Knight,
@@ -87,7 +89,7 @@ impl ToString for Color {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Square(pub i8, pub i8);
 
 impl Square {
@@ -271,7 +273,7 @@ pub enum MoveDir {
     UpLeft,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Moves(pub Vec<ChessMove>);
 
 impl Moves {

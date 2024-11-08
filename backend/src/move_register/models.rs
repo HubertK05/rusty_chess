@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     board_setup::models::Board,
     move_generator::models::{PieceType, Square},
@@ -15,7 +17,7 @@ pub enum MoveError {
     PieceNotFound,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum CastleType {
     WhiteShort,
     WhiteLong,
@@ -23,7 +25,7 @@ pub enum CastleType {
     BlackLong,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PromotedPieceType {
     Queen,
     Knight,
@@ -31,7 +33,7 @@ pub enum PromotedPieceType {
     Rook,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum MoveType {
     Move(PieceType),
     Capture(PieceType),
@@ -51,7 +53,7 @@ pub enum RawMoveType {
     PromotionCapture,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ChessMove {
     pub move_type: MoveType,
     pub from: Square,
