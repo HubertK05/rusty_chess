@@ -5,7 +5,6 @@ pub mod piece_tables;
 pub mod space_eval;
 pub mod zobrist;
 
-use rand::{seq::SliceRandom, thread_rng};
 use std::{cmp::Ordering, collections::BTreeMap};
 
 use self::{
@@ -16,13 +15,13 @@ use self::{
     zobrist::hash_with_move,
 };
 use crate::{
-    board_setup::models::{Board, FenNotation},
+    board_setup::models::Board,
+    config::AppSettings,
     move_generator::{
         models::{ChessPiece, Color, Moves, Offset, PieceType, Square},
         restrictions::get_checked,
     },
     move_register::models::{ChessMove, MoveType},
-    opening_book::{move_parser::parse_move, OpeningBook}, config::AppSettings,
 };
 
 pub const MVV_LVA_TABLE: [[i16; 6]; 6] = [
@@ -80,7 +79,6 @@ impl MovePayload {
 pub fn choose_move(
     board: &Board,
     mut rep_map: BTreeMap<u64, u8>,
-    book: &OpeningBook,
     settings: AppSettings,
 ) -> Option<ChessMove> {
     let limit = match board.turn {
@@ -88,31 +86,34 @@ pub fn choose_move(
         Color::Black => i16::MIN,
     };
 
-    let fen = FenNotation::try_from(board).expect("failed to get fen from board");
+    let hash = board.hash_board();
 
-    if let Some(move_vec) = book.0.get(&fen.to_draw_fen()) {
-        let mut rng = thread_rng();
-        let san = move_vec
-            .choose_weighted(&mut rng, |(_, popularity)| *popularity)
-            .unwrap();
-        let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
-        println!("played book move");
-
-        Some(res)
+    let (payload, pos_count) = if settings.search_depth == 1 {
+        search_game_tree(
+            board,
+            0,
+            settings.search_depth,
+            limit as i32,
+            hash,
+            &mut rep_map,
+            settings,
+        )
     } else {
-        let hash = board.hash_board();
-
-        let (payload, pos_count) = if settings.search_depth == 1 {
-            search_game_tree(board, 0, settings.search_depth, limit as i32, hash, &mut rep_map, settings)
-        } else {
-            search_game_tree(board, 0, settings.search_depth, limit as i32, hash, &mut rep_map, settings)
-        };
-        println!(
-            "eval: {}\nthe number of positions tested: {pos_count}",
-            payload.eval
-        );
-        payload.played_move
-    }
+        search_game_tree(
+            board,
+            0,
+            settings.search_depth,
+            limit as i32,
+            hash,
+            &mut rep_map,
+            settings,
+        )
+    };
+    println!(
+        "eval: {}\nthe number of positions tested: {pos_count}",
+        payload.eval
+    );
+    payload.played_move
 }
 
 fn is_in_check(board: &Board) -> bool {
@@ -194,7 +195,8 @@ pub fn search_game_tree(
     settings: AppSettings,
 ) -> (MovePayload, u64) {
     let move_set = get_ordered_moves(board);
-    let base_eval = evaluate_position(board).with_positional_factor(settings.positional_value_factor);
+    let base_eval =
+        evaluate_position(board).with_positional_factor(settings.positional_value_factor);
     let is_endgame = is_endgame(board);
 
     if move_set.len() == 0 {
@@ -240,9 +242,9 @@ pub fn search_game_tree(
                     (
                         MovePayload::new(
                             Some(test_move),
-                                base_eval
+                            base_eval
                                 + evaluate_chg(board, test_move, is_endgame)
-                                .with_positional_factor(settings.positional_value_factor),
+                                    .with_positional_factor(settings.positional_value_factor),
                             Vec::new(),
                         ),
                         1,
@@ -267,7 +269,12 @@ pub fn search_game_tree(
 
         if depth == 0 && settings.eval_print {
             if branch_payload.played_move.is_some() {
-                print_eval(new_board, test_move, branch_payload.eval, &branch_payload.line);
+                print_eval(
+                    new_board,
+                    test_move,
+                    branch_payload.eval,
+                    &branch_payload.line,
+                );
             } else {
                 println!("evaluation of the move {test_move}: pruned/no legal move");
             }

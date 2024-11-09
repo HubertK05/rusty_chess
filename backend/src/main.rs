@@ -9,12 +9,12 @@ use std::{
 use backend::{
     board_setup::models::{Board, FenNotation},
     chess_bot::{
-        choose_move, get_ordered_moves, is_endgame,
-        piece_tables::evaluate_chg, search_game_tree,
+        choose_move, get_ordered_moves, is_endgame, piece_tables::evaluate_chg, search_game_tree,
     },
+    config::AppSettings,
     move_generator::models::{MoveRestrictionData, Moves, PieceType, Square},
     move_register::models::{ChessMove, MoveType},
-    opening_book::{get_opening_book, OpeningBook}, config::AppSettings,
+    opening_book::{get_opening_book, OpeningBook},
 };
 use easybench::bench;
 
@@ -25,8 +25,8 @@ fn main() {
     let mut board = Board::new_game();
     let mut game_counter = 1;
     let mut rep_map = BTreeMap::new();
-    let book = OpeningBook::from_file("opening_book.txt");
-    let ext_settings = AppSettings::get_from_file("./config/settings.toml").expect("failed to get settings");
+    let ext_settings =
+        AppSettings::get_from_file("./config/settings.toml").expect("failed to get settings");
 
     struct OptionThread {
         thread: Option<JoinHandle<ChessMove>>,
@@ -38,10 +38,9 @@ fn main() {
         if bot.thread.is_none() {
             let new_board = *&board;
             let new_rep_map = rep_map.clone();
-            let new_book = book.clone();
             let settings = ext_settings;
             let x = thread::spawn(move || {
-                choose_move(&new_board, new_rep_map, &new_book, settings).expect("no move chosen")
+                choose_move(&new_board, new_rep_map, settings).expect("no move chosen")
             });
             bot.thread = Some(x);
         }
@@ -114,7 +113,8 @@ fn do_benchmarks() {
         from: Square(4, 1),
         to: Square(4, 3),
     };
-    let ext_settings = AppSettings::get_from_file("./config/settings.toml").expect("failed to get settings");
+    let ext_settings =
+        AppSettings::get_from_file("./config/settings.toml").expect("failed to get settings");
 
     println!(
         "eval chg - {}",
@@ -122,11 +122,27 @@ fn do_benchmarks() {
     );
     println!(
         "search to depth 2 - {}",
-        bench(|| search_game_tree(&board, 0, 2, i32::MIN, board.hash_board(), &mut rep_map, ext_settings))
+        bench(|| search_game_tree(
+            &board,
+            0,
+            2,
+            i32::MIN,
+            board.hash_board(),
+            &mut rep_map,
+            ext_settings
+        ))
     );
     println!(
         "last depth search - {}",
-        bench(|| search_game_tree(&board, 0, 1, i32::MIN, board.hash_board(), &mut rep_map, ext_settings))
+        bench(|| search_game_tree(
+            &board,
+            0,
+            1,
+            i32::MIN,
+            board.hash_board(),
+            &mut rep_map,
+            ext_settings
+        ))
     );
     println!(
         "get unordered moves - {}",

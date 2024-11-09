@@ -1,9 +1,13 @@
 use std::collections::BTreeMap;
 
 use backend::{
-    board_setup::models::Board, config::AppSettings, move_generator::models::Moves,
-    move_register::models::ChessMove, opening_book::OpeningBook,
+    board_setup::models::{Board, FenNotation},
+    config::AppSettings,
+    move_generator::models::Moves,
+    move_register::models::ChessMove,
+    opening_book::{move_parser::parse_move, OpeningBook},
 };
+use rand::{seq::SliceRandom, thread_rng};
 use tauri::async_runtime::Mutex;
 
 struct AppState {
@@ -15,12 +19,21 @@ struct AppState {
 
 #[tauri::command]
 async fn autoplay_move(state: tauri::State<'_, AppState>) -> Result<ChessMove, String> {
-    let chosen_move = {
-        let board_guard = state.board.lock().await;
+    let board_guard = state.board.lock().await;
+    let fen = FenNotation::from(&*board_guard);
+    let chosen_move = if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
+        let mut rng = thread_rng();
+        let san = move_vec
+            .choose_weighted(&mut rng, |(_, popularity)| *popularity)
+            .unwrap();
+        let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
+        println!("played book move");
+
+        Some(res)
+    } else {
         backend::chess_bot::choose_move(
             &board_guard,
             state.repetition_map.clone(),
-            &state.opening_book,
             state.app_settings,
         )
     };
