@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import Square from "../components/Square.svelte";
   import { board } from "../lib/shared.svelte";
+  import { dndzone } from "svelte-dnd-action";
   
     type BotState = "on" | "off";
   type Turn = "White" | "Black";
@@ -12,24 +14,32 @@
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
   }
+
+  async function getLegalMoves() {
+    return await invoke('get_legal_moves')
+  }
+
+  async function autoplayMove() {
+    return await invoke('autoplay_move')
+  }
 </script>
 
 <main class="flex justify-center items-center h-screen">
   <div class="flex">      
     <div>
         {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
-        <div class="flex flex-row">
-          {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
-            <Square row={row} col={col} />
-          {/each}
-        </div>
-      {/each}
+            <div class="flex flex-row">
+                {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
+                    <Square {row} {col} />
+                {/each}
+            </div>
+        {/each}
     </div>
 
     <div class="grid gap-4 w-64 ml-4">
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
-        on:click={() => {
+        onclick={() => {
           reversed = !reversed;
         }}
       >
@@ -52,8 +62,9 @@
 
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
-        on:click={() => {
+        onclick={async () => {
           botState = botState === "off" ? "on" : "off";
+          console.log(await autoplayMove());
         }}
       >
         Toggle bot ({botState})
