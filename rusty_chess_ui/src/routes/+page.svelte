@@ -3,8 +3,8 @@
   import Square from "../components/Square.svelte";
   import { board } from "../lib/shared.svelte";
   import { dndzone } from "svelte-dnd-action";
-  
-    type BotState = "on" | "off";
+
+  type BotState = "on" | "off";
   type Turn = "White" | "Black";
 
   let reversed = false;
@@ -16,24 +16,24 @@
   }
 
   async function getLegalMoves() {
-    return await invoke('get_legal_moves')
+    return await invoke("get_legal_moves");
   }
 
   async function autoplayMove() {
-    return await invoke('autoplay_move')
+    return await invoke("autoplay_move");
   }
 </script>
 
 <main class="flex justify-center items-center h-screen">
-  <div class="flex">      
+  <div class="flex">
     <div>
-        {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
-            <div class="flex flex-row">
-                {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
-                    <Square {row} {col} />
-                {/each}
-            </div>
-        {/each}
+      {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
+        <div class="flex flex-row">
+          {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
+            <Square {row} {col} />
+          {/each}
+        </div>
+      {/each}
     </div>
 
     <div class="grid gap-4 w-64 ml-4">
@@ -46,7 +46,7 @@
         Reverse board
       </button>
 
-      {#if turn as Turn === "White"}
+      {#if (turn as Turn) === "White"}
         <div
           class="bg-gray-300 text-black rounded-lg flex items-center justify-center py-2"
         >

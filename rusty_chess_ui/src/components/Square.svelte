@@ -36,10 +36,10 @@
 
 <div
   class={`
-    w-16 h-16
+    w-16 h-16 overflow-hidden
     ${(row + col) % 2 === 0 ? "bg-yellow-300" : "bg-orange-800"}
     `}
-  use:dndzone={{ items }}
+  use:dndzone={{ items, dropTargetStyle: {} }}
   onconsider={(e) => {
     handleConsider(e);
   }}
