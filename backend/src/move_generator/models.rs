@@ -64,7 +64,7 @@ impl Display for PieceType {
     }
 }
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Color {
     White,
     Black,
@@ -203,7 +203,7 @@ impl Display for Offset {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ChessPiece {
     pub piece_type: PieceType,
     pub color: Color,

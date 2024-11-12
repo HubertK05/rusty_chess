@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
@@ -124,7 +125,7 @@ impl TryFrom<(char, Square)> for ChessPiece {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Board {
     pub board: [[Option<ChessPiece>; 8]; 8],
     pub turn: Color,
@@ -258,7 +259,7 @@ impl Board {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AvailableCastles {
     pub white_short: bool,
     pub white_long: bool,
