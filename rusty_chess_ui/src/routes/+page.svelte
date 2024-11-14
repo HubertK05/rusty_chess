@@ -64,7 +64,7 @@
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
           botState = botState === "off" ? "on" : "off";
-          console.log(await autoplayMove());
+          console.log(await getLegalMoves());
         }}
       >
         Toggle bot ({botState})
