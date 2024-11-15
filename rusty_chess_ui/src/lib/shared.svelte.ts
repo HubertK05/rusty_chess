@@ -34,14 +34,11 @@ let boardPre = [
 ];
 
 export let board: Board = $state(
-    {
-        board: boardPre.map((x, row) => {
-            return x.map((elem, col) => {
-                return elem === "" ? [] : [{ id: row * 8 + col, piece: pieceFromString(elem) }]
-            })
-        }),
-        turn: "White"
-    }
+    boardPre.map((x, row) => {
+        return x.map((elem, col) => {
+            return elem === "" ? [] : [{ id: row * 8 + col, piece: pieceFromString(elem) }]
+        })
+    }),
 )
 
 console.log($state.snapshot(board))

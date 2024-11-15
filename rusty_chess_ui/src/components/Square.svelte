@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { board } from "$lib/shared.svelte";
+  import { board, pieceFromString, pieceToString } from "$lib/shared.svelte";
   import { dndzone } from "svelte-dnd-action";
 
   let { row, col }: { row: number; col: number } = $props();
 
-  let items: { id: number; content: string }[] = $derived(board[row][col]);
+  let items: DraggableChessPiece[] = $derived(board[row][col]);
 
   function handleConsider(e: {
     detail: {
-      items: { id: number; content: string; isDndShadowItem?: boolean }[];
+      items: DraggableChessPiece[];
     };
   }) {
     board[row][col] = e.detail.items;
@@ -16,7 +16,7 @@
 
   function handleFinalize(e: {
     detail: {
-      items: { id: number; content: string; isDndShadowItem?: boolean }[];
+      items: DraggableChessPiece[];
     };
   }) {
     if (board[row][col].length >= 2) {
@@ -49,7 +49,7 @@
 >
   {#each board[row][col] as piece (piece.id)}
     <img
-      src={`../src/assets/${piece.content}.svg`}
+      src={`../src/assets/${pieceToString(piece.piece)}.svg`}
       alt="A chess piece"
       class="w-full h-full"
     />

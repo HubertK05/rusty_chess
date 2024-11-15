@@ -3,10 +3,7 @@ interface BackendBoard {
     turn: Color,
 }
 
-interface Board {
-    board: DraggableChessPiece[][][],
-    turn: Color,
-}
+type Board = DraggableChessPiece[][][];
 
 interface ChessPiece {
     piece_type: PieceType,
@@ -16,6 +13,7 @@ interface ChessPiece {
 interface DraggableChessPiece {
     id: number,
     piece: ChessPiece,
+    isDndShadowItem?: boolean,
 }
 
 type PieceType = "Pawn" | "Knight" | "Bishop" | "Rook" | "Queen" | "King";
