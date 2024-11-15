@@ -1,4 +1,4 @@
-const pieceFromString: (x: string) => ChessPiece = (pieceString) => {
+export const pieceFromString: (x: string) => ChessPiece = (pieceString) => {
     const pieceTable: Record<string, ChessPiece> = {
         "wR": { piece_type: "Rook", color: "White" },
         "wN": { piece_type: "Knight", color: "White" },
@@ -17,8 +17,8 @@ const pieceFromString: (x: string) => ChessPiece = (pieceString) => {
     return pieceTable[pieceString] ?? undefined
 }
 
-const pieceToString: (x: ChessPiece) => String = (piece) => {
-    return `${piece.color[0]}${piece.piece_type[0]}`
+export const pieceToString: (x: ChessPiece) => String = (piece) => {
+    return `${piece.color[0].toLowerCase()}${piece.piece_type[0].toUpperCase()}`
 }
 
 
