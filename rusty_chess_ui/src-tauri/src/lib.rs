@@ -8,17 +8,50 @@ use backend::{
     opening_book::{move_parser::parse_move, OpeningBook},
 };
 use rand::{seq::SliceRandom, thread_rng};
-use tauri::async_runtime::Mutex;
+use tauri::{async_runtime::Mutex, AppHandle, Emitter};
 
 struct AppState {
     board: Mutex<Board>,
-    repetition_map: BTreeMap<u64, u8>,
+    repetition_map: Mutex<BTreeMap<u64, u8>>,
     opening_book: OpeningBook,
     app_settings: AppSettings,
 }
 
+impl AppState {
+    /// Plays a given move, while also sending an event to update the board in the frontend.
+    async fn play_move_loudly(
+        &self,
+        app: AppHandle,
+        move_to_play: ChessMove,
+    ) -> Result<(), String> {
+        let mut board_guard = self.board.lock().await;
+
+        board_guard
+            .register_move(move_to_play)
+            .map_err(|e| format!("Error registering move: {e:?}"))?;
+
+        let board_hash = board_guard.hash_board();
+
+        self.repetition_map
+            .lock()
+            .await
+            .entry(board_hash)
+            .and_modify(|x| *x += 1)
+            .or_insert(1);
+
+        println!("Attempting to emit event");
+        app.emit("update-board", *board_guard)
+            .map_err(|e| format!("Failed to send update-board event: {e:?}"))?;
+
+        Ok(())
+    }
+}
+
 #[tauri::command]
-async fn autoplay_move(state: tauri::State<'_, AppState>) -> Result<ChessMove, String> {
+async fn autoplay_move(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<ChessMove, String> {
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
     let chosen_move = if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
@@ -33,10 +66,16 @@ async fn autoplay_move(state: tauri::State<'_, AppState>) -> Result<ChessMove, S
     } else {
         backend::chess_bot::choose_move(
             &board_guard,
-            state.repetition_map.clone(),
+            state.repetition_map.lock().await.clone(),
             state.app_settings,
         )
     };
+
+    drop(board_guard);
+
+    if let Some(m) = chosen_move {
+        state.play_move_loudly(app, m).await?;
+    }
 
     return chosen_move.ok_or("Failed to choose move".into());
 }
@@ -53,7 +92,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             board: Mutex::new(Board::new_game()),
-            repetition_map: BTreeMap::new(),
+            repetition_map: Mutex::new(BTreeMap::new()),
             opening_book: OpeningBook::from_file("opening_book.txt"),
             app_settings: AppSettings::get_from_file("settings.toml").unwrap(),
         })

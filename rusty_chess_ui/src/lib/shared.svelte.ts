@@ -18,7 +18,11 @@ export const pieceFromString: (x: string) => ChessPiece = (pieceString) => {
 }
 
 export const pieceToString: (x: ChessPiece) => String = (piece) => {
-    return `${piece.color[0].toLowerCase()}${piece.piece_type[0].toUpperCase()}`
+    if (piece.piece_type == "Knight") {
+        return `${piece.color[0].toLowerCase()}N`
+    } else {
+        return `${piece.color[0].toLowerCase()}${piece.piece_type[0].toUpperCase()}`
+    }
 }
 
 

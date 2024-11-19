@@ -3,6 +3,7 @@
   import Square from "../components/Square.svelte";
   import { board } from "../lib/shared.svelte";
   import { dndzone } from "svelte-dnd-action";
+  import { listen } from "@tauri-apps/api/event";
 
   type BotState = "on" | "off";
   type Turn = "White" | "Black";
@@ -20,8 +21,32 @@
   }
 
   async function autoplayMove() {
-    return await invoke("autoplay_move");
+    const res = await invoke("autoplay_move");
+    console.log(res);
   }
+
+  listen<BackendBoard>("update-board", (event) => {
+    console.log(
+      `Update board may be successful: ${event.payload.board}, ${event.payload.turn}`
+    );
+
+    const newBoard: Board = event.payload.board.map((row, rowNumber) =>
+      row.map((piece, colNumber) =>
+        piece
+          ? [
+              {
+                id: rowNumber * 8 + colNumber,
+                piece,
+              },
+            ]
+          : []
+      )
+    );
+
+    newBoard.forEach((row, rowNumber) => {
+      board[rowNumber] = row;
+    });
+  });
 </script>
 
 <main class="flex justify-center items-center h-screen">
@@ -64,7 +89,7 @@
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
           botState = botState === "off" ? "on" : "off";
-          console.log(await getLegalMoves());
+          console.log(await autoplayMove());
         }}
       >
         Toggle bot ({botState})
