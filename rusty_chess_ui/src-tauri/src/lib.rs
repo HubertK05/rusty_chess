@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use backend::{
     board_setup::models::{Board, FenNotation},
     config::AppSettings,
-    move_generator::models::Moves,
+    move_generator::models::{MoveRestrictionData, Moves},
     move_register::models::ChessMove,
     opening_book::{move_parser::parse_move, OpeningBook},
 };
@@ -15,6 +15,11 @@ struct AppState {
     repetition_map: Mutex<BTreeMap<u64, u8>>,
     opening_book: OpeningBook,
     app_settings: AppSettings,
+}
+
+enum GameOutcome {
+    Ongoing,
+    Done(String),
 }
 
 impl AppState {
@@ -43,7 +48,49 @@ impl AppState {
         app.emit("update-board", *board_guard)
             .map_err(|e| format!("Failed to send update-board event: {e:?}"))?;
 
+        drop(board_guard);
+
+        if let GameOutcome::Done(msg) = self.get_game_outcome().await {
+            app.emit("end-game", msg)
+                .map_err(|e| format!("Failed to send end-game event: {e:?}"))?;
+        }
+
         Ok(())
+    }
+
+    async fn get_game_outcome(&self) -> GameOutcome {
+        let board_guard = self.board.lock().await;
+        if board_guard.half_move_timer_50 > 100 {
+            return GameOutcome::Done("Draw by the 50 move rule".into());
+        } else if board_guard.mating_material.0 < 3 && board_guard.mating_material.1 < 3 {
+            return GameOutcome::Done("Draw by insufficitent mating material".into());
+        } else if Moves::get_all_moves(&board_guard, board_guard.turn)
+            .0
+            .is_empty()
+        {
+            if MoveRestrictionData::get(&board_guard, board_guard.turn)
+                .check_squares
+                .checks_amount
+                != 0
+            {
+                return GameOutcome::Done(format!(
+                    "{} wins by checkmate",
+                    board_guard.turn.opp().to_string()
+                ));
+            } else {
+                return GameOutcome::Done("Draw by stalemate".into());
+            }
+        } else if self
+            .repetition_map
+            .lock()
+            .await
+            .iter()
+            .any(|(_pos, occurences)| *occurences >= 3)
+        {
+            return GameOutcome::Done("Draw by threefold repetition".into());
+        } else {
+            return GameOutcome::Ongoing;
+        }
     }
 }
 
