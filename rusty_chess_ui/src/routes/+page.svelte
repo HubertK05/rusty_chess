@@ -6,7 +6,7 @@
   import { listen } from "@tauri-apps/api/event";
 
   type BotState = "on" | "off";
-  type Turn = "White" | "Black";
+  type Turn = "White" | "Black" | { endgameMsg: string };
 
   let reversed = false;
   let botState = "off";
@@ -47,6 +47,10 @@
       board[rowNumber] = row;
     });
   });
+
+  listen<string>("end-game", (event) => {
+    turn = { endgameMsg: event.payload };
+  });
 </script>
 
 <main class="flex justify-center items-center h-screen">
@@ -77,11 +81,17 @@
         >
           White's turn
         </div>
-      {:else}
+      {:else if (turn as Turn) === "Black"}
         <div
           class="bg-black text-gray-400 rounded-lg flex items-center justify-center py-2"
         >
           Black's turn
+        </div>
+      {:else}
+        <div
+          class="text-gray-400 rounded-lg flex items-center justify-center py-2"
+        >
+          {(turn as { endgameMsg: string }).endgameMsg}
         </div>
       {/if}
 
