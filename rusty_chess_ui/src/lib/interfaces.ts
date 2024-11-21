@@ -18,3 +18,14 @@ interface DraggableChessPiece {
 
 type PieceType = "Pawn" | "Knight" | "Bishop" | "Rook" | "Queen" | "King";
 type Color = "White" | "Black";
+
+type CastleType = "WhiteShort" | "WhiteLong" | "BlackShort" | "BlackLong";
+type PromotedPieceType = "Queen" | "Knight" | "Bishop" | "Rook";
+
+type MoveType = { Move: PieceType } | { Capture: PieceType } | "EnPassantMove" | { CastleMove: CastleType } | { PromotionMove: PromotedPieceType } | { PromotionCapture: PromotedPieceType };
+
+interface ChessMove {
+    move_type: MoveType,
+    from: number[],
+    to: number[],
+}
