@@ -1,16 +1,42 @@
 <script lang="ts">
-  import { board, pieceFromString, pieceToString } from "$lib/shared.svelte";
+  import {
+    board,
+    legalMoves,
+    pieceFromString,
+    pieceToString,
+  } from "$lib/shared.svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { dndzone } from "svelte-dnd-action";
 
   let { row, col }: { row: number; col: number } = $props();
 
   let items: DraggableChessPiece[] = $derived(board[row][col]);
 
-  function handleConsider(e: {
+  function getSquareStyle() {
+    if (
+      legalMoves.moves.find((move) => move.to[0] === col && move.to[1] == row)
+    ) {
+      return "bg-red-500";
+    }
+    return (row + col) % 2 === 0 ? "bg-yellow-300" : "bg-orange-800";
+  }
+
+  async function getLegalMoves(): Promise<ChessMove[]> {
+    return await invoke("get_legal_moves");
+  }
+
+  async function handleConsider(e: {
     detail: {
       items: DraggableChessPiece[];
     };
   }) {
+    const draggedItems = e.detail.items.filter((x) => x.isDndShadowItem);
+    if (draggedItems.find((x) => x.id === row * 8 + col)) {
+      legalMoves.moves = (await getLegalMoves()).filter(
+        (move) => move.from[0] === col && move.from[1] === row
+      );
+    }
+
     board[row][col] = e.detail.items;
   }
 
@@ -19,6 +45,7 @@
       items: DraggableChessPiece[];
     };
   }) {
+    legalMoves.moves = [];
     if (board[row][col].length >= 2) {
       e.detail.items.forEach((incoming) =>
         board[row][col].find((current) => current.id === incoming.id)
@@ -36,8 +63,7 @@
 
 <div
   class={`
-    w-16 h-16 overflow-hidden
-    ${(row + col) % 2 === 0 ? "bg-yellow-300" : "bg-orange-800"}
+    w-16 h-16 overflow-hidden ${getSquareStyle()}
     `}
   use:dndzone={{ items, dropTargetStyle: {} }}
   onconsider={(e) => {

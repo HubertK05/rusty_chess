@@ -45,4 +45,6 @@ export let board: Board = $state(
     }),
 )
 
-console.log($state.snapshot(board))
+export let legalMoves: { moves: ChessMove[] } = $state({
+    moves: []
+})

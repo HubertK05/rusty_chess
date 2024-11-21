@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import Square from "../components/Square.svelte";
-  import { board } from "../lib/shared.svelte";
+  import { board, legalMoves } from "../lib/shared.svelte";
   import { dndzone } from "svelte-dnd-action";
   import { listen } from "@tauri-apps/api/event";
 
@@ -14,10 +14,6 @@
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
-  }
-
-  async function getLegalMoves() {
-    return await invoke("get_legal_moves");
   }
 
   async function autoplayMove() {
@@ -99,7 +95,6 @@
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
           botState = botState === "off" ? "on" : "off";
-          console.log(await autoplayMove());
         }}
       >
         Toggle bot ({botState})
