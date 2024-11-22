@@ -16,11 +16,6 @@
     return Array.from({ length: n }, (_, i) => i);
   }
 
-  async function autoplayMove() {
-    const res = await invoke("autoplay_move");
-    console.log(res);
-  }
-
   listen<BackendBoard>("update-board", (event) => {
     console.log(
       `Update board may be successful: ${event.payload.board}, ${event.payload.turn}`

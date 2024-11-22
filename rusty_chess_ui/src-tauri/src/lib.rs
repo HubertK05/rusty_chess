@@ -133,6 +133,15 @@ async fn get_legal_moves(state: tauri::State<'_, AppState>) -> Result<Moves, ()>
     Ok(Moves::get_all_moves(&board_guard, board_guard.turn))
 }
 
+#[tauri::command]
+async fn play_move_manually(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    move_to_play: ChessMove,
+) -> Result<(), String> {
+    state.play_move_loudly(app, move_to_play).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -143,7 +152,11 @@ pub fn run() {
             opening_book: OpeningBook::from_file("opening_book.txt"),
             app_settings: AppSettings::get_from_file("settings.toml").unwrap(),
         })
-        .invoke_handler(tauri::generate_handler![autoplay_move, get_legal_moves])
+        .invoke_handler(tauri::generate_handler![
+            play_move_manually,
+            autoplay_move,
+            get_legal_moves
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
