@@ -58,26 +58,41 @@
       .snapshot(board[row][col])
       .filter((x) => x.isDndShadowItem && x.id !== row * 8 + col);
 
+    let moveToPlay: ChessMove | undefined;
     if (pieceWasMoved.length !== 0) {
       //   console.log(pieceWasMoved);
       const from = pieceWasMoved[0].id;
       const to = row * 8 + col;
       //   console.log(from, to);
-      const moveToPlay = legalMoves.moves.filter(
+      const movesToPlay = legalMoves.moves.filter(
         (move) =>
           move.from[1] * 8 + move.from[0] === from &&
           move.to[1] * 8 + move.to[0] === to
       );
-      console.log("Moves to play: ", moveToPlay);
+      console.log("Moves to play: ", movesToPlay);
       console.assert(
-        moveToPlay.length === 1,
-        `Expected one move to play, got ${moveToPlay}`
+        movesToPlay.length <= 1,
+        `Expected at most one move to play, got ${movesToPlay}`
       );
-      await playMoveManually(moveToPlay[0]);
+      if (movesToPlay[0]) moveToPlay = movesToPlay[0];
     }
-    console.log(row * 8 + col, $state.snapshot(board[row][col]), pieceWasMoved);
 
     legalMoves.moves = [];
+
+    if (!moveToPlay) {
+      if (e.detail.items.length === 0) return;
+
+      e.detail.items.forEach((item) => {
+        board[(item.id / 8) >> 0][item.id % 8 >> 0] = [item];
+      });
+      const filteredItems = e.detail.items.filter(
+        (item) => item.id === row * 8 + col
+      );
+      board[row][col] = filteredItems;
+      return;
+    }
+
+    await playMoveManually(moveToPlay);
     if (board[row][col].length >= 2) {
       e.detail.items.forEach((incoming) =>
         board[row][col].find((current) => current.id === incoming.id)
