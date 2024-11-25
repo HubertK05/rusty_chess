@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::OnceLock};
 
 use backend::{
     board_setup::models::{Board, FenNotation},
@@ -8,13 +8,17 @@ use backend::{
     opening_book::{move_parser::parse_move, OpeningBook},
 };
 use rand::{seq::SliceRandom, thread_rng};
-use tauri::{async_runtime::Mutex, AppHandle, Emitter};
+use tauri::{
+    async_runtime::{channel, Mutex, Receiver, Sender},
+    AppHandle, Emitter, Listener, Manager,
+};
 
 struct AppState {
     board: Mutex<Board>,
     repetition_map: Mutex<BTreeMap<u64, u8>>,
     opening_book: OpeningBook,
     app_settings: AppSettings,
+    cancel_channel: OnceLock<Mutex<tauri::async_runtime::Receiver<()>>>,
 }
 
 enum GameOutcome {
@@ -101,6 +105,18 @@ async fn autoplay_move(
 ) -> Result<ChessMove, String> {
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
+
+    let _ = {
+        state
+            .cancel_channel
+            .get()
+            .unwrap()
+            .lock()
+            .await
+            .recv()
+            .await
+    };
+
     let chosen_move = if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
         let mut rng = thread_rng();
         let san = move_vec
@@ -119,6 +135,22 @@ async fn autoplay_move(
     };
 
     drop(board_guard);
+
+    let is_canceled = {
+        state
+            .cancel_channel
+            .get()
+            .unwrap()
+            .lock()
+            .await
+            .recv()
+            .await
+            .is_some()
+    };
+
+    if is_canceled {
+        return Err("Autoplay move canceled".into());
+    }
 
     if let Some(m) = chosen_move {
         state.play_move_loudly(app, m).await?;
@@ -151,6 +183,18 @@ pub fn run() {
             repetition_map: Mutex::new(BTreeMap::new()),
             opening_book: OpeningBook::from_file("opening_book.txt"),
             app_settings: AppSettings::get_from_file("settings.toml").unwrap(),
+            cancel_channel: OnceLock::new(),
+        })
+        .setup(|app| {
+            let (sender, receiver): (Sender<()>, Receiver<()>) = channel(1);
+            app.state::<AppState>()
+                .cancel_channel
+                .set(Mutex::new(receiver))
+                .expect("Attempted to set the channel more than once");
+            app.listen("download-started", move |_| {
+                let _ = sender.try_send(());
+            });
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             play_move_manually,
