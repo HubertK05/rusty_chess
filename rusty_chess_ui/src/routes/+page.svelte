@@ -4,6 +4,7 @@
   import { board, legalMoves } from "../lib/shared.svelte";
   import { dndzone } from "svelte-dnd-action";
   import { listen } from "@tauri-apps/api/event";
+  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   type BotState = "on" | "off";
   type Turn = "White" | "Black" | { endgameMsg: string };
@@ -14,6 +15,11 @@
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
+  }
+
+  function cancelMove() {
+    const appWebview = getCurrentWebviewWindow();
+    appWebview.emit("cancel-move");
   }
 
   listen<BackendBoard>("update-board", (event) => {
@@ -90,6 +96,7 @@
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
           botState = botState === "off" ? "on" : "off";
+          cancelMove();
         }}
       >
         Toggle bot ({botState})

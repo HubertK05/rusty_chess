@@ -103,19 +103,11 @@ async fn autoplay_move(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<ChessMove, String> {
+    println!("Autoplaying move");
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
 
-    let _ = {
-        state
-            .cancel_channel
-            .get()
-            .unwrap()
-            .lock()
-            .await
-            .recv()
-            .await
-    };
+    let _ = { state.cancel_channel.get().unwrap().lock().await.try_recv() };
 
     let chosen_move = if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
         let mut rng = thread_rng();
@@ -136,6 +128,7 @@ async fn autoplay_move(
 
     drop(board_guard);
 
+    println!("Checking cancel");
     let is_canceled = {
         state
             .cancel_channel
@@ -143,12 +136,13 @@ async fn autoplay_move(
             .unwrap()
             .lock()
             .await
-            .recv()
-            .await
+            .try_recv()
+            .ok()
             .is_some()
     };
 
     if is_canceled {
+        println!("Canceled");
         return Err("Autoplay move canceled".into());
     }
 
@@ -191,7 +185,7 @@ pub fn run() {
                 .cancel_channel
                 .set(Mutex::new(receiver))
                 .expect("Attempted to set the channel more than once");
-            app.listen("download-started", move |_| {
+            app.listen("cancel-move", move |_| {
                 let _ = sender.try_send(());
             });
             Ok(())
