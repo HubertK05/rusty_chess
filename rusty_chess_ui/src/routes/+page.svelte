@@ -9,9 +9,9 @@
   type BotState = "on" | "off";
   type Turn = "White" | "Black" | { endgameMsg: string };
 
-  let reversed = false;
-  let botState = "off";
-  let turn: Turn = "White";
+  let reversed = $state(false);
+  let botState = $state("off");
+  let turn: Turn = $state("White");
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
@@ -23,10 +23,6 @@
   }
 
   listen<BackendBoard>("update-board", (event) => {
-    console.log(
-      `Update board may be successful: ${event.payload.board}, ${event.payload.turn}`
-    );
-
     const newBoard: Board = event.payload.board.map((row, rowNumber) =>
       row.map((piece, colNumber) =>
         piece

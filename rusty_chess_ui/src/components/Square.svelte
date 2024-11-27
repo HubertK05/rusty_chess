@@ -60,16 +60,13 @@
 
     let moveToPlay: ChessMove | undefined;
     if (pieceWasMoved.length !== 0) {
-      //   console.log(pieceWasMoved);
       const from = pieceWasMoved[0].id;
       const to = row * 8 + col;
-      //   console.log(from, to);
       const movesToPlay = legalMoves.moves.filter(
         (move) =>
           move.from[1] * 8 + move.from[0] === from &&
           move.to[1] * 8 + move.to[0] === to
       );
-      console.log("Moves to play: ", movesToPlay);
       console.assert(
         movesToPlay.length <= 1,
         `Expected at most one move to play, got ${movesToPlay}`
@@ -92,7 +89,6 @@
       return;
     }
 
-    await playMoveManually(moveToPlay);
     if (board[row][col].length >= 2) {
       e.detail.items.forEach((incoming) =>
         board[row][col].find((current) => current.id === incoming.id)
@@ -105,6 +101,7 @@
     } else {
       board[row][col] = e.detail.items;
     }
+    await playMoveManually(moveToPlay);
 
     if (pieceWasMoved.length !== 0) {
       await autoplayMove();
