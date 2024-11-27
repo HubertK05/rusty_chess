@@ -7,11 +7,17 @@
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   type BotState = "on" | "off";
-  type Turn = "White" | "Black" | { endgameMsg: string };
+  type CurrentPlayer =
+    | "white"
+    | "whiteBot"
+    | "black"
+    | "blackBot"
+    | { endgameMsg: string };
 
   let reversed = $state(false);
-  let botState = $state("off");
-  let turn: Turn = $state("White");
+  let whiteBotState = $state("off");
+  let blackBotState = $state("off");
+  let turn: CurrentPlayer = $state("white");
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
@@ -60,7 +66,7 @@
 
     <div class="grid gap-4 w-64 ml-4">
       <button
-        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
+        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400 row-span-2"
         onclick={() => {
           reversed = !reversed;
         }}
@@ -68,21 +74,21 @@
         Reverse board
       </button>
 
-      {#if (turn as Turn) === "White"}
+      {#if (turn as CurrentPlayer) === "white" || (turn as CurrentPlayer) === "whiteBot"}
         <div
-          class="bg-gray-300 text-black rounded-lg flex items-center justify-center py-2"
+          class="bg-gray-300 text-black rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           White's turn
         </div>
-      {:else if (turn as Turn) === "Black"}
+      {:else if (turn as CurrentPlayer) === "black" || (turn as CurrentPlayer) === "blackBot"}
         <div
-          class="bg-black text-gray-400 rounded-lg flex items-center justify-center py-2"
+          class="bg-black text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           Black's turn
         </div>
       {:else}
         <div
-          class="text-gray-400 rounded-lg flex items-center justify-center py-2"
+          class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           {(turn as { endgameMsg: string }).endgameMsg}
         </div>
@@ -91,11 +97,19 @@
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          botState = botState === "off" ? "on" : "off";
-          cancelMove();
+          whiteBotState = whiteBotState === "off" ? "on" : "off";
         }}
       >
-        Toggle bot ({botState})
+        White's bot ({whiteBotState})
+      </button>
+
+      <button
+        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
+        onclick={async () => {
+          blackBotState = blackBotState === "off" ? "on" : "off";
+        }}
+      >
+        Black's bot ({blackBotState})
       </button>
     </div>
   </div>
