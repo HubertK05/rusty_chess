@@ -29,3 +29,12 @@ interface ChessMove {
     from: number[],
     to: number[],
 }
+
+type CurrentPlayer =
+    | "white"
+    | "whiteBot"
+    | "black"
+    | "blackBot"
+    | { endgameMsg: string };
+
+type BotState = "off" | "on"

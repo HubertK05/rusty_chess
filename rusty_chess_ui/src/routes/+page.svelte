@@ -1,30 +1,28 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import Square from "../components/Square.svelte";
-  import { board, legalMoves } from "../lib/shared.svelte";
+  import {
+    autoplayMove,
+    blackBotState,
+    board,
+    CurrentPlayerState,
+    legalMoves,
+    turn,
+    whiteBotState,
+  } from "../lib/shared.svelte";
   import { dndzone } from "svelte-dnd-action";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
-  type BotState = "on" | "off";
-  type CurrentPlayer =
-    | "white"
-    | "whiteBot"
-    | "black"
-    | "blackBot"
-    | { endgameMsg: string };
+  const appWebview = getCurrentWebviewWindow();
 
   let reversed = $state(false);
-  let whiteBotState = $state("off");
-  let blackBotState = $state("off");
-  let turn: CurrentPlayer = $state("white");
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
   }
 
   function cancelMove() {
-    const appWebview = getCurrentWebviewWindow();
     appWebview.emit("cancel-move");
   }
 
@@ -48,7 +46,7 @@
   });
 
   listen<string>("end-game", (event) => {
-    turn = { endgameMsg: event.payload };
+    turn.turn = { endgameMsg: event.payload };
   });
 </script>
 
@@ -74,13 +72,13 @@
         Reverse board
       </button>
 
-      {#if (turn as CurrentPlayer) === "white" || (turn as CurrentPlayer) === "whiteBot"}
+      {#if (turn.turn as CurrentPlayer) === "white" || (turn.turn as CurrentPlayer) === "whiteBot"}
         <div
           class="bg-gray-300 text-black rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           White's turn
         </div>
-      {:else if (turn as CurrentPlayer) === "black" || (turn as CurrentPlayer) === "blackBot"}
+      {:else if (turn.turn as CurrentPlayer) === "black" || (turn.turn as CurrentPlayer) === "blackBot"}
         <div
           class="bg-black text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
@@ -90,14 +88,14 @@
         <div
           class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
-          {(turn as { endgameMsg: string }).endgameMsg}
+          {(turn.turn as { endgameMsg: string }).endgameMsg}
         </div>
       {/if}
 
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          whiteBotState = whiteBotState === "off" ? "on" : "off";
+          whiteBotState.state = whiteBotState.state === "off" ? "on" : "off";
         }}
       >
         White's bot ({whiteBotState})
@@ -106,7 +104,7 @@
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          blackBotState = blackBotState === "off" ? "on" : "off";
+          blackBotState.state = blackBotState.state === "off" ? "on" : "off";
         }}
       >
         Black's bot ({blackBotState})

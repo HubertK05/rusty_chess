@@ -1,9 +1,11 @@
 <script lang="ts">
   import {
+    autoplayMove,
     board,
     legalMoves,
     pieceFromString,
     pieceToString,
+    playMoveManually,
   } from "$lib/shared.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { dndzone } from "svelte-dnd-action";
@@ -23,15 +25,6 @@
 
   async function getLegalMoves(): Promise<ChessMove[]> {
     return await invoke("get_legal_moves");
-  }
-
-  async function autoplayMove() {
-    const res = await invoke("autoplay_move");
-    console.log(res);
-  }
-
-  async function playMoveManually(moveToPlay: ChessMove) {
-    await invoke("play_move_manually", { moveToPlay });
   }
 
   async function handleConsider(e: {
@@ -107,6 +100,10 @@
       await autoplayMove();
     }
   }
+
+  function advanceTurn() {
+    throw new Error("Function not implemented.");
+  }
 </script>
 
 <div
@@ -129,3 +126,13 @@
     />
   {/each}
 </div>
+
+<!--
+
+Events that change the state:
+- playing move manually (changes turn to opposite color - human or bot, depending on the bot state),
+- autoplaying move (same as playing move manually),
+- turning the bot on (which can result in autoplaying move)
+- turning the bot off (which can result in canceling move)
+
+-->
