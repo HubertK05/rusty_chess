@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 
 export const pieceFromString: (x: string) => ChessPiece = (pieceString) => {
     const pieceTable: Record<string, ChessPiece> = {
@@ -57,6 +58,16 @@ export class CurrentBotState {
     
     set state(newState: BotState) {
         this._state = newState
+    }
+
+    toggle() {
+        console.log(this._state, "off", this._state === "off");
+        if (this._state === "off") {
+            this._state = "on"
+        } else {
+            this._state = "off"
+        }
+        console.log(this._state)
     }
 }
 
@@ -117,6 +128,34 @@ function advanceTurn() {
         autoplayMove();
         } else {
         turn.turn = "white";
+        }
+    }
+}
+
+const appWebview = getCurrentWebviewWindow();
+
+function cancelMove() {
+    appWebview.emit("cancel-move");
+}
+
+export function toggleBot(color: Color) {
+    if (color === "White") {
+        whiteBotState.toggle()
+        if (turn.turn === "white") {
+            turn.turn = "whiteBot"
+            autoplayMove()
+        } else if (turn.turn === "whiteBot") {
+            turn.turn = "white"
+            cancelMove()
+        }
+    } else {
+        blackBotState.toggle()
+        if (turn.turn === "black") {
+            turn.turn = "blackBot"
+            autoplayMove()
+        } else if (turn.turn === "blackBot") {
+            turn.turn = "black"
+            cancelMove()
         }
     }
 }

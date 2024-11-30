@@ -7,6 +7,7 @@
     board,
     CurrentPlayerState,
     legalMoves,
+    toggleBot,
     turn,
     whiteBotState,
   } from "../lib/shared.svelte";
@@ -14,16 +15,10 @@
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
-  const appWebview = getCurrentWebviewWindow();
-
   let reversed = $state(false);
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
-  }
-
-  function cancelMove() {
-    appWebview.emit("cancel-move");
   }
 
   listen<BackendBoard>("update-board", (event) => {
@@ -95,21 +90,22 @@
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          whiteBotState.state = whiteBotState.state === "off" ? "on" : "off";
+          toggleBot("White");
         }}
       >
-        White's bot ({whiteBotState})
+        White's bot ({whiteBotState.state})
       </button>
 
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          blackBotState.state = blackBotState.state === "off" ? "on" : "off";
+          toggleBot("Black");
         }}
       >
-        Black's bot ({blackBotState})
+        Black's bot ({blackBotState.state})
       </button>
     </div>
+    Turn: {turn.turn}
   </div>
 </main>
 

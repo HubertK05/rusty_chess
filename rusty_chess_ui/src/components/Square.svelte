@@ -100,10 +100,6 @@
       await autoplayMove();
     }
   }
-
-  function advanceTurn() {
-    throw new Error("Function not implemented.");
-  }
 </script>
 
 <div
