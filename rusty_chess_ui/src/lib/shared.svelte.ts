@@ -28,26 +28,41 @@ export const pieceToString: (x: ChessPiece) => String = (piece) => {
     }
 }
 
+export class BoardState {
+    _board: Board = $state([]);
 
-let boardPre = [
-    ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
-    ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["", "", "", "", "", "", "", ""],
-    ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
-    ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
-];
+    constructor() {
+        // TODO: Can I keep DRY without using constructors that rely on other methods?
+        this.restart()
+    }
 
-export let board: Board = $state(
-    boardPre.map((x, row) => {
-        return x.map((elem, col) => {
-            return elem === "" ? [] : [{ id: row * 8 + col, piece: pieceFromString(elem) }]
+    restart() {
+        const boardPre = [
+            ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
+            ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["", "", "", "", "", "", "", ""],
+            ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
+            ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
+        ];
+
+        this._board = boardPre.map((x, row) => {
+            return x.map((elem, col) => {
+                return elem === "" ? [] : [{ id: row * 8 + col, piece: pieceFromString(elem) }]
+            })
         })
-    }),
-)
+    }
 
+    get board() {
+        return this._board;
+    }
+
+    set board(newBoard: Board) {
+        this._board = newBoard;
+    }
+}
 
 export class CurrentBotState {
     _state: BotState = $state("off")
@@ -70,7 +85,6 @@ export class CurrentBotState {
         console.log(this._state)
     }
 }
-
 
 export class CurrentPlayerState {
     _turn: CurrentPlayer = $state("white")
@@ -102,6 +116,7 @@ export async function playMoveManually(moveToPlay: ChessMove) {
     await advanceTurn();
 }
 
+export let board = new BoardState();
 export let whiteBotState = new CurrentBotState();
 export let blackBotState = new CurrentBotState();
 export let turn = new CurrentPlayerState();
@@ -134,7 +149,7 @@ async function advanceTurn() {
 
 const appWebview = getCurrentWebviewWindow();
 
-function cancelMove() {
+export function cancelMove() {
     appWebview.emit("cancel-move");
 }
 

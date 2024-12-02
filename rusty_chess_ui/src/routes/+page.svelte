@@ -5,6 +5,7 @@
     autoplayMove,
     blackBotState,
     board,
+    cancelMove,
     CurrentPlayerState,
     legalMoves,
     toggleBot,
@@ -35,9 +36,7 @@
       )
     );
 
-    newBoard.forEach((row, rowNumber) => {
-      board[rowNumber] = row;
-    });
+    board.board = newBoard;
   });
 
   listen<string>("end-game", (event) => {
@@ -65,6 +64,20 @@
         }}
       >
         Reverse board
+      </button>
+
+      <button
+        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400 row-span-2"
+        onclick={async () => {
+          reversed = false;
+          whiteBotState.state = "off";
+          blackBotState.state = "off";
+          turn.turn = "white";
+          board.restart();
+          cancelMove();
+        }}
+      >
+        Restart game
       </button>
 
       {#if (turn.turn as CurrentPlayer) === "white" || (turn.turn as CurrentPlayer) === "whiteBot"}

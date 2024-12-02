@@ -13,7 +13,7 @@
 
   let { row, col }: { row: number; col: number } = $props();
 
-  let items: DraggableChessPiece[] = $derived(board[row][col]);
+  let items: DraggableChessPiece[] = $derived(board.board[row][col]);
 
   function getSquareStyle() {
     if (
@@ -40,7 +40,7 @@
       );
     }
 
-    board[row][col] = e.detail.items;
+    board.board[row][col] = e.detail.items;
   }
 
   async function handleFinalize(e: {
@@ -49,7 +49,7 @@
     };
   }) {
     const pieceWasMoved = $state
-      .snapshot(board[row][col])
+      .snapshot(board.board[row][col])
       .filter((x) => x.isDndShadowItem && x.id !== row * 8 + col);
 
     let moveToPlay: ChessMove | undefined;
@@ -74,26 +74,26 @@
       if (e.detail.items.length === 0) return;
 
       e.detail.items.forEach((item) => {
-        board[(item.id / 8) >> 0][item.id % 8 >> 0] = [item];
+        board.board[(item.id / 8) >> 0][item.id % 8 >> 0] = [item];
       });
       const filteredItems = e.detail.items.filter(
         (item) => item.id === row * 8 + col
       );
-      board[row][col] = filteredItems;
+      board.board[row][col] = filteredItems;
       return;
     }
 
-    if (board[row][col].length >= 2) {
+    if (board.board[row][col].length >= 2) {
       e.detail.items.forEach((incoming) =>
-        board[row][col].find((current) => current.id === incoming.id)
+        board.board[row][col].find((current) => current.id === incoming.id)
       );
-      board[row][col] = e.detail.items.filter(
+      board.board[row][col] = e.detail.items.filter(
         (incoming) =>
-          board[row][col].find((current) => current.id === incoming.id)!
+          board.board[row][col].find((current) => current.id === incoming.id)!
             .isDndShadowItem === true
       );
     } else {
-      board[row][col] = e.detail.items;
+      board.board[row][col] = e.detail.items;
     }
     await playMoveManually(moveToPlay);
   }
@@ -115,7 +115,7 @@
     handleFinalize(e);
   }}
 >
-  {#each board[row][col] as piece (piece.id)}
+  {#each board.board[row][col] as piece (piece.id)}
     <img
       src={`../src/assets/${pieceToString(piece.piece)}.svg`}
       alt="A chess piece"
