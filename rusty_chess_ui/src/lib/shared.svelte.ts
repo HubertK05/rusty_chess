@@ -116,6 +116,10 @@ export async function playMoveManually(moveToPlay: ChessMove) {
     await advanceTurn();
 }
 
+export async function restartGameState() {
+    await invoke("restart_game");
+}
+
 export let board = new BoardState();
 export let whiteBotState = new CurrentBotState();
 export let blackBotState = new CurrentBotState();

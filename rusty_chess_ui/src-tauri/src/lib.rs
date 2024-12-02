@@ -96,6 +96,11 @@ impl AppState {
             return GameOutcome::Ongoing;
         }
     }
+
+    async fn restart(&self) {
+        *self.board.lock().await = Board::new_game();
+        *self.repetition_map.lock().await = BTreeMap::new();
+    }
 }
 
 #[tauri::command]
@@ -106,6 +111,9 @@ async fn autoplay_move(
     println!("Autoplaying move");
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
+
+    let board = board_guard.clone();
+    drop(board_guard);
 
     let _ = { state.cancel_channel.get().unwrap().lock().await.try_recv() };
 
@@ -120,13 +128,11 @@ async fn autoplay_move(
         Some(res)
     } else {
         backend::chess_bot::choose_move(
-            &board_guard,
+            &board,
             state.repetition_map.lock().await.clone(),
             state.app_settings,
         )
     };
-
-    drop(board_guard);
 
     println!("Checking cancel");
     let is_canceled = {
@@ -168,6 +174,12 @@ async fn play_move_manually(
     state.play_move_loudly(app, move_to_play).await
 }
 
+#[tauri::command]
+async fn restart_game(state: tauri::State<'_, AppState>) -> Result<(), ()> {
+    state.restart().await;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -193,7 +205,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             play_move_manually,
             autoplay_move,
-            get_legal_moves
+            get_legal_moves,
+            restart_game,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

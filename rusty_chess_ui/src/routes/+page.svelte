@@ -8,6 +8,7 @@
     cancelMove,
     CurrentPlayerState,
     legalMoves,
+    restartGameState,
     toggleBot,
     turn,
     whiteBotState,
@@ -58,7 +59,7 @@
 
     <div class="grid gap-4 w-64 ml-4">
       <button
-        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400 row-span-2"
+        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={() => {
           reversed = !reversed;
         }}
@@ -67,7 +68,7 @@
       </button>
 
       <button
-        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400 row-span-2"
+        class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
           reversed = false;
           whiteBotState.state = "off";
@@ -75,6 +76,7 @@
           turn.turn = "white";
           board.restart();
           cancelMove();
+          restartGameState();
         }}
       >
         Restart game
