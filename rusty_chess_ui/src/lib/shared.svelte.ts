@@ -129,7 +129,8 @@ async function advanceTurn() {
     console.log(turn.turn);
     if (
         (turn.turn as CurrentPlayer) == "white" ||
-        (turn.turn as CurrentPlayer) == "whiteBot"
+        (turn.turn as CurrentPlayer) == "whiteBot" ||
+        (turn.turn as { color: Color }).color === "White"
     ) {
         if (blackBotState.state == "on") {
             turn.turn = "blackBot";
@@ -139,8 +140,9 @@ async function advanceTurn() {
             turn.turn = "black";
         }
     } else if (
-        (turn.turn as CurrentPlayer) == "black" ||
-        (turn.turn as CurrentPlayer) == "blackBot"
+        (turn.turn as CurrentPlayer) === "black" ||
+        (turn.turn as CurrentPlayer) === "blackBot" ||
+        (turn.turn as { color: Color }).color === "Black"
     ) {
         if (whiteBotState.state == "on") {
             turn.turn = "whiteBot";

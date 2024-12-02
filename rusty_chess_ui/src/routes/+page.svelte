@@ -8,6 +8,7 @@
     cancelMove,
     CurrentPlayerState,
     legalMoves,
+    playMoveManually,
     restartGameState,
     toggleBot,
     turn,
@@ -21,6 +22,26 @@
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
+  }
+
+  async function promotePawn(
+    pieceType: PromotedPieceType,
+    color: Color,
+    promotionOptions: ChessMove[]
+  ) {
+    const playedMove = promotionOptions.filter(
+      (move) =>
+        (move.move_type as { PromotionMove: PromotedPieceType })
+          .PromotionMove === pieceType ||
+        (move.move_type as { PromotionCapture: PromotedPieceType })
+          .PromotionCapture === pieceType
+    );
+
+    console.assert(
+      playedMove.length === 1,
+      `Expected one promotion move option to play, got ${playedMove}`
+    );
+    await playMoveManually(playedMove[0]);
   }
 
   listen<BackendBoard>("update-board", (event) => {
@@ -94,11 +115,76 @@
         >
           Black's turn
         </div>
-      {:else}
+      {:else if (turn.turn as { endgameMsg: string }).endgameMsg}
         <div
           class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           {(turn.turn as { endgameMsg: string }).endgameMsg}
+        </div>
+      {:else if (turn.turn as { promotionOptions: ChessMove[]; color: Color }).color}
+        <div
+          class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
+        >
+          <button
+            onclick={async () =>
+              await promotePawn(
+                "Queen",
+                (turn.turn as { color: Color }).color,
+                (turn.turn as { promotionOptions: ChessMove[] })
+                  .promotionOptions
+              )}
+          >
+            <img
+              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wQ" : "bQ"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
+          <button
+            onclick={async () =>
+              await promotePawn(
+                "Rook",
+                (turn.turn as { color: Color }).color,
+                (turn.turn as { promotionOptions: ChessMove[] })
+                  .promotionOptions
+              )}
+          >
+            <img
+              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wR" : "bR"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
+          <button
+            onclick={async () =>
+              await promotePawn(
+                "Bishop",
+                (turn.turn as { color: Color }).color,
+                (turn.turn as { promotionOptions: ChessMove[] })
+                  .promotionOptions
+              )}
+          >
+            <img
+              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wB" : "bB"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
+          <button
+            onclick={async () =>
+              await promotePawn(
+                "Knight",
+                (turn.turn as { color: Color }).color,
+                (turn.turn as { promotionOptions: ChessMove[] })
+                  .promotionOptions
+              )}
+          >
+            <img
+              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wN" : "bN"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
         </div>
       {/if}
 
@@ -120,7 +206,6 @@
         Black's bot ({blackBotState.state})
       </button>
     </div>
-    Turn: {turn.turn}
   </div>
 </main>
 

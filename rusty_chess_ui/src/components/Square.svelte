@@ -52,25 +52,24 @@
       .snapshot(board.board[row][col])
       .filter((x) => x.isDndShadowItem && x.id !== row * 8 + col);
 
-    let moveToPlay: ChessMove | undefined;
+    let movesToPlay: ChessMove[] = [];
     if (pieceWasMoved.length !== 0) {
       const from = pieceWasMoved[0].id;
       const to = row * 8 + col;
-      const movesToPlay = legalMoves.moves.filter(
+      movesToPlay = legalMoves.moves.filter(
         (move) =>
           move.from[1] * 8 + move.from[0] === from &&
           move.to[1] * 8 + move.to[0] === to
       );
       console.assert(
-        movesToPlay.length <= 1,
+        movesToPlay.length <= 1 || movesToPlay.length === 4,
         `Expected at most one move to play, got ${movesToPlay}`
       );
-      if (movesToPlay[0]) moveToPlay = movesToPlay[0];
     }
 
     legalMoves.moves = [];
 
-    if (!moveToPlay) {
+    if (movesToPlay.length === 0 || movesToPlay.length === 4) {
       if (e.detail.items.length === 0) return;
 
       e.detail.items.forEach((item) => {
@@ -80,9 +79,23 @@
         (item) => item.id === row * 8 + col
       );
       board.board[row][col] = filteredItems;
+
+      if (movesToPlay.length === 4) {
+        console.assert(
+          turn.turn === "black" || turn.turn == "white",
+          "Expected a player's turn during promotion, not bot"
+        );
+        const currentTurn: Color = turn.turn === "white" ? "White" : "Black";
+        turn.turn = {
+          promotionOptions: movesToPlay,
+          color: currentTurn,
+        };
+      }
+
       return;
     }
 
+    const moveToPlay = movesToPlay[0];
     if (board.board[row][col].length >= 2) {
       e.detail.items.forEach((incoming) =>
         board.board[row][col].find((current) => current.id === incoming.id)
@@ -106,7 +119,7 @@
   use:dndzone={{
     items,
     dropTargetStyle: {},
-    dragDisabled: turn.turn === "whiteBot" || turn.turn === "blackBot",
+    dragDisabled: !(turn.turn === "white" || turn.turn === "black"),
   }}
   onconsider={(e) => {
     handleConsider(e);
@@ -123,13 +136,3 @@
     />
   {/each}
 </div>
-
-<!--
-
-Events that change the state:
-- playing move manually (changes turn to opposite color - human or bot, depending on the bot state),
-- autoplaying move (same as playing move manually),
-- turning the bot on (which can result in autoplaying move)
-- turning the bot off (which can result in canceling move)
-
--->
