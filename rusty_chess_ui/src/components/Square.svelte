@@ -6,6 +6,7 @@
     pieceFromString,
     pieceToString,
     playMoveManually,
+    turn,
   } from "$lib/shared.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { dndzone } from "svelte-dnd-action";
@@ -95,10 +96,6 @@
       board[row][col] = e.detail.items;
     }
     await playMoveManually(moveToPlay);
-
-    if (pieceWasMoved.length !== 0) {
-      await autoplayMove();
-    }
   }
 </script>
 
@@ -106,7 +103,11 @@
   class={`
     w-16 h-16 overflow-hidden ${getSquareStyle()}
     `}
-  use:dndzone={{ items, dropTargetStyle: {} }}
+  use:dndzone={{
+    items,
+    dropTargetStyle: {},
+    dragDisabled: turn.turn === "whiteBot" || turn.turn === "blackBot",
+  }}
   onconsider={(e) => {
     handleConsider(e);
   }}

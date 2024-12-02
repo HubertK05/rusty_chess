@@ -91,7 +91,7 @@ export let legalMoves: { moves: ChessMove[] } = $state({
 export async function autoplayMove() {
     try {
         await invoke("autoplay_move");
-        advanceTurn();
+        await advanceTurn();
     } catch (e) {
         // event canceled
     }
@@ -99,35 +99,35 @@ export async function autoplayMove() {
 
 export async function playMoveManually(moveToPlay: ChessMove) {
     await invoke("play_move_manually", { moveToPlay });
-    advanceTurn();
+    await advanceTurn();
 }
 
 export let whiteBotState = new CurrentBotState();
 export let blackBotState = new CurrentBotState();
 export let turn = new CurrentPlayerState();
 
-function advanceTurn() {
+async function advanceTurn() {
     console.log(turn.turn);
     if (
         (turn.turn as CurrentPlayer) == "white" ||
         (turn.turn as CurrentPlayer) == "whiteBot"
     ) {
         if (blackBotState.state == "on") {
-        turn.turn = "blackBot";
-        // yes. recursive call. TODO: upgrade state machine such that it doesn't rely on recursion
-        autoplayMove();
+            turn.turn = "blackBot";
+            // yes. recursive call. TODO: upgrade state machine such that it doesn't rely on recursion
+            await autoplayMove();
         } else {
-        turn.turn = "black";
+            turn.turn = "black";
         }
     } else if (
         (turn.turn as CurrentPlayer) == "black" ||
         (turn.turn as CurrentPlayer) == "blackBot"
     ) {
         if (whiteBotState.state == "on") {
-        turn.turn = "whiteBot";
-        autoplayMove();
+            turn.turn = "whiteBot";
+            await autoplayMove();
         } else {
-        turn.turn = "white";
+            turn.turn = "white";
         }
     }
 }
@@ -138,12 +138,12 @@ function cancelMove() {
     appWebview.emit("cancel-move");
 }
 
-export function toggleBot(color: Color) {
+export async function toggleBot(color: Color) {
     if (color === "White") {
         whiteBotState.toggle()
         if (turn.turn === "white") {
             turn.turn = "whiteBot"
-            autoplayMove()
+            await autoplayMove()
         } else if (turn.turn === "whiteBot") {
             turn.turn = "white"
             cancelMove()
@@ -152,7 +152,7 @@ export function toggleBot(color: Color) {
         blackBotState.toggle()
         if (turn.turn === "black") {
             turn.turn = "blackBot"
-            autoplayMove()
+            await autoplayMove()
         } else if (turn.turn === "blackBot") {
             turn.turn = "black"
             cancelMove()

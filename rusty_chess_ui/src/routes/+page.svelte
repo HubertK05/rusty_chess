@@ -90,7 +90,7 @@
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          toggleBot("White");
+          await toggleBot("White");
         }}
       >
         White's bot ({whiteBotState.state})
@@ -99,7 +99,7 @@
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          toggleBot("Black");
+          await toggleBot("Black");
         }}
       >
         Black's bot ({blackBotState.state})
