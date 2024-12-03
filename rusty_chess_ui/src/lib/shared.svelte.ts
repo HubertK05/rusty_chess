@@ -180,3 +180,124 @@ export async function toggleBot(color: Color) {
         }
     }
 }
+
+export class TurnStateMachine {
+    #turn: CurrentPlayer = $state("white");
+    #otherBotState: BotState = $state("off");
+
+    setWhite() {
+        this.#turn = "white"
+        cancelMove();
+    }
+
+    async setWhiteBot() {
+        this.#turn = "whiteBot"
+        await autoplayMove();
+    }
+
+    setBlack() {
+        this.#turn = "black"
+        cancelMove();
+    }
+
+    async setBlackBot() {
+        this.#turn = "blackBot"
+        await autoplayMove();
+    }
+
+    // State described as turn/otherBotState
+    async toggleWhiteBot() {
+        // white/- => whiteBot/-
+        // whiteBot/- => white/-
+        // black/off => black/on
+        // black/on => black/off
+        // blackBot/off => blackBot/on
+        // blackBot/on => blackBot/off
+        const transitions: Record<("white" | "whiteBot" | "black" | "blackBot"), Record<BotState, any[]>> = {
+            "white": {
+                "off": [this.setWhiteBot, "off"],
+                "on": [this.setWhiteBot, "on"],
+            },
+            "whiteBot": {
+                "off": [this.setWhite, "off"],
+                "on": [this.setWhite, "on"],
+            },
+            "black": {
+                "off": [this.setBlack, "on"],
+                "on": [this.setBlack, "off"],
+            },
+            "blackBot": {
+                "off": [this.setBlackBot, "on"],
+                "on": [this.setBlackBot, "off"],
+            }
+        }
+
+        const transition = transitions[this.#turn as ("white" | "whiteBot" | "black" | "blackBot")][this.#otherBotState]
+        this.#otherBotState = transition[1]
+        transition[0]()
+    }
+
+    async toggleBlackBot() {
+        // black/- => blackBot/-
+        // blackBot/- => black/-
+        // white/off => white/on
+        // white/on => white/off
+        // whiteBot/off => whiteBot/on
+        // whiteBot/on => whiteBot/off
+        const transitions: Record<("white" | "whiteBot" | "black" | "blackBot"), Record<BotState, any[]>> = {
+            "white": {
+                "off": [this.setWhite, "on"],
+                "on": [this.setWhite, "off"],
+            },
+            "whiteBot": {
+                "off": [this.setWhiteBot, "on"],
+                "on": [this.setWhiteBot, "off"],
+            },
+            "black": {
+                "off": [this.setBlackBot, "off"],
+                "on": [this.setBlackBot, "on"],
+            },
+            "blackBot": {
+                "off": [this.setBlack, "off"],
+                "on": [this.setBlack, "on"],
+            }
+        }
+
+        const transition = transitions[this.#turn as ("white" | "whiteBot" | "black" | "blackBot")][this.#otherBotState]
+        this.#otherBotState = transition[1]
+        transition[0]()
+    }
+
+    async advanceTurn() {
+        // white/off => black/off
+        // white/on => blackBot/off
+        // whiteBot/off => black/on
+        // whiteBot/on => blackBot/on
+        // black/off => white/off
+        // black/on => whiteBot/off
+        // blackBot/off => white/on
+        // blackBot/on => whiteBot/on
+        const transitions: Record<("white" | "whiteBot" | "black" | "blackBot"), Record<BotState, any[]>> = {
+            "white": {
+                "off": [this.setBlack, "off"],
+                "on": [this.setBlackBot, "off"],
+            },
+            "whiteBot": {
+                "off": [this.setBlack, "on"],
+                "on": [this.setBlackBot, "on"],
+            },
+            "black": {
+                "off": [this.setWhite, "off"],
+                "on": [this.setWhiteBot, "off"],
+            },
+            "blackBot": {
+                "off": [this.setWhite, "on"],
+                "on": [this.setWhiteBot, "on"],
+            }
+        }
+
+        const transition = transitions[this.#turn as ("white" | "whiteBot" | "black" | "blackBot")][this.#otherBotState]
+        this.#otherBotState = transition[1]
+        transition[0]()
+    }
+}
