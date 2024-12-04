@@ -3,16 +3,13 @@
   import Square from "../components/Square.svelte";
   import {
     autoplayMove,
-    blackBotState,
     board,
     cancelMove,
     CurrentPlayerState,
     legalMoves,
     playMoveManually,
     restartGameState,
-    toggleBot,
-    turn,
-    whiteBotState,
+    turnState,
   } from "../lib/shared.svelte";
   import { dndzone } from "svelte-dnd-action";
   import { listen } from "@tauri-apps/api/event";
@@ -62,7 +59,7 @@
   });
 
   listen<string>("end-game", (event) => {
-    turn.turn = { endgameMsg: event.payload };
+    turnState.endGame(event.payload);
   });
 </script>
 
@@ -92,36 +89,33 @@
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
           reversed = false;
-          whiteBotState.state = "off";
-          blackBotState.state = "off";
-          turn.turn = "white";
+          turnState.restartGame();
           board.restart();
-          cancelMove();
           restartGameState();
         }}
       >
         Restart game
       </button>
 
-      {#if (turn.turn as CurrentPlayer) === "white" || (turn.turn as CurrentPlayer) === "whiteBot"}
+      {#if (turnState.turn as CurrentPlayer) === "white" || (turnState.turn as CurrentPlayer) === "whiteBot"}
         <div
           class="bg-gray-300 text-black rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           White's turn
         </div>
-      {:else if (turn.turn as CurrentPlayer) === "black" || (turn.turn as CurrentPlayer) === "blackBot"}
+      {:else if (turnState.turn as CurrentPlayer) === "black" || (turnState.turn as CurrentPlayer) === "blackBot"}
         <div
           class="bg-black text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           Black's turn
         </div>
-      {:else if (turn.turn as { endgameMsg: string }).endgameMsg}
+      {:else if (turnState.turn as { endgameMsg: string }).endgameMsg}
         <div
           class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
-          {(turn.turn as { endgameMsg: string }).endgameMsg}
+          {(turnState.turn as { endgameMsg: string }).endgameMsg}
         </div>
-      {:else if (turn.turn as { promotionOptions: ChessMove[]; color: Color }).color}
+      {:else if (turnState.turn as { promotionOptions: ChessMove[]; color: Color }).color}
         <div
           class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
@@ -129,13 +123,13 @@
             onclick={async () =>
               await promotePawn(
                 "Queen",
-                (turn.turn as { color: Color }).color,
-                (turn.turn as { promotionOptions: ChessMove[] })
+                (turnState.turn as { color: Color }).color,
+                (turnState.turn as { promotionOptions: ChessMove[] })
                   .promotionOptions
               )}
           >
             <img
-              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wQ" : "bQ"}.svg`}
+              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wQ" : "bQ"}.svg`}
               alt="A chess piece"
               class="w-full h-full"
             />
@@ -144,13 +138,13 @@
             onclick={async () =>
               await promotePawn(
                 "Rook",
-                (turn.turn as { color: Color }).color,
-                (turn.turn as { promotionOptions: ChessMove[] })
+                (turnState.turn as { color: Color }).color,
+                (turnState.turn as { promotionOptions: ChessMove[] })
                   .promotionOptions
               )}
           >
             <img
-              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wR" : "bR"}.svg`}
+              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wR" : "bR"}.svg`}
               alt="A chess piece"
               class="w-full h-full"
             />
@@ -159,13 +153,13 @@
             onclick={async () =>
               await promotePawn(
                 "Bishop",
-                (turn.turn as { color: Color }).color,
-                (turn.turn as { promotionOptions: ChessMove[] })
+                (turnState.turn as { color: Color }).color,
+                (turnState.turn as { promotionOptions: ChessMove[] })
                   .promotionOptions
               )}
           >
             <img
-              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wB" : "bB"}.svg`}
+              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wB" : "bB"}.svg`}
               alt="A chess piece"
               class="w-full h-full"
             />
@@ -174,13 +168,13 @@
             onclick={async () =>
               await promotePawn(
                 "Knight",
-                (turn.turn as { color: Color }).color,
-                (turn.turn as { promotionOptions: ChessMove[] })
+                (turnState.turn as { color: Color }).color,
+                (turnState.turn as { promotionOptions: ChessMove[] })
                   .promotionOptions
               )}
           >
             <img
-              src={`../src/assets/${(turn.turn as { color: Color }).color === "White" ? "wN" : "bN"}.svg`}
+              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wN" : "bN"}.svg`}
               alt="A chess piece"
               class="w-full h-full"
             />
@@ -191,19 +185,19 @@
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          await toggleBot("White");
+          await turnState.toggleWhiteBot();
         }}
       >
-        White's bot ({whiteBotState.state})
+        White's bot ({turnState.whiteBotState})
       </button>
 
       <button
         class="bg-gray-500 border-2 border-gray-700 rounded-lg py-2 px-4 hover:border-gray-400"
         onclick={async () => {
-          await toggleBot("Black");
+          await turnState.toggleBlackBot();
         }}
       >
-        Black's bot ({blackBotState.state})
+        Black's bot ({turnState.blackBotState})
       </button>
     </div>
   </div>

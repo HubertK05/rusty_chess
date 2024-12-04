@@ -6,7 +6,7 @@
     pieceFromString,
     pieceToString,
     playMoveManually,
-    turn,
+    turnState,
   } from "$lib/shared.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { dndzone } from "svelte-dnd-action";
@@ -82,14 +82,15 @@
 
       if (movesToPlay.length === 4) {
         console.assert(
-          turn.turn === "black" || turn.turn == "white",
+          turnState.turn === "black" || turnState.turn == "white",
           "Expected a player's turn during promotion, not bot"
         );
-        const currentTurn: Color = turn.turn === "white" ? "White" : "Black";
-        turn.turn = {
-          promotionOptions: movesToPlay,
-          color: currentTurn,
-        };
+        // const currentTurn: Color =
+        //   turnState.turn === "white" ? "White" : "Black";
+        // turnState.turn = {
+        //   promotionOptions: movesToPlay,
+        //   color: currentTurn,
+        // };
       }
 
       return;
@@ -119,7 +120,7 @@
   use:dndzone={{
     items,
     dropTargetStyle: {},
-    dragDisabled: !(turn.turn === "white" || turn.turn === "black"),
+    dragDisabled: !(turnState.turn === "white" || turnState.turn === "black"),
   }}
   onconsider={(e) => {
     handleConsider(e);

@@ -102,107 +102,58 @@ export let legalMoves: { moves: ChessMove[] } = $state({
     moves: []
 })
 
-export async function autoplayMove() {
-    try {
-        await invoke("autoplay_move");
-        await advanceTurn();
-    } catch (e) {
-        // event canceled
-    }
-}
-
-export async function playMoveManually(moveToPlay: ChessMove) {
-    await invoke("play_move_manually", { moveToPlay });
-    await advanceTurn();
-}
-
-export async function restartGameState() {
-    await invoke("restart_game");
-}
-
 export let board = new BoardState();
-export let whiteBotState = new CurrentBotState();
-export let blackBotState = new CurrentBotState();
-export let turn = new CurrentPlayerState();
-
-async function advanceTurn() {
-    console.log(turn.turn);
-    if (
-        (turn.turn as CurrentPlayer) == "white" ||
-        (turn.turn as CurrentPlayer) == "whiteBot" ||
-        (turn.turn as { color: Color }).color === "White"
-    ) {
-        if (blackBotState.state == "on") {
-            turn.turn = "blackBot";
-            // yes. recursive call. TODO: upgrade state machine such that it doesn't rely on recursion
-            await autoplayMove();
-        } else {
-            turn.turn = "black";
-        }
-    } else if (
-        (turn.turn as CurrentPlayer) === "black" ||
-        (turn.turn as CurrentPlayer) === "blackBot" ||
-        (turn.turn as { color: Color }).color === "Black"
-    ) {
-        if (whiteBotState.state == "on") {
-            turn.turn = "whiteBot";
-            await autoplayMove();
-        } else {
-            turn.turn = "white";
-        }
-    }
-}
-
-const appWebview = getCurrentWebviewWindow();
-
-export function cancelMove() {
-    appWebview.emit("cancel-move");
-}
-
-export async function toggleBot(color: Color) {
-    if (color === "White") {
-        whiteBotState.toggle()
-        if (turn.turn === "white") {
-            turn.turn = "whiteBot"
-            await autoplayMove()
-        } else if (turn.turn === "whiteBot") {
-            turn.turn = "white"
-            cancelMove()
-        }
-    } else {
-        blackBotState.toggle()
-        if (turn.turn === "black") {
-            turn.turn = "blackBot"
-            await autoplayMove()
-        } else if (turn.turn === "blackBot") {
-            turn.turn = "black"
-            cancelMove()
-        }
-    }
-}
 
 export class TurnStateMachine {
-    #turn: CurrentPlayer = $state("white");
-    #otherBotState: BotState = $state("off");
+    _turn: CurrentPlayer = $state("white");
+    _otherBotState: BotState = $state("off");
 
-    setWhite() {
-        this.#turn = "white"
+    setWhite = () => {
+        this._turn = "white"
         cancelMove();
     }
 
-    async setWhiteBot() {
-        this.#turn = "whiteBot"
+    setWhiteBot = async () => {
+        this._turn = "whiteBot"
         await autoplayMove();
     }
 
-    setBlack() {
-        this.#turn = "black"
+    setBlack = () => {
+        this._turn = "black"
         cancelMove();
     }
 
-    async setBlackBot() {
-        this.#turn = "blackBot"
+    setBlackBot = async () => {
+        this._turn = "blackBot"
         await autoplayMove();
+    }
+
+    endGame(msg: string) {
+        this._turn = { endgameMsg: msg }
+        cancelMove();
+    }
+
+    restartGame() {
+        this.setWhite()
+        this._otherBotState = "off"
+    }
+
+    get turn() {
+        return this._turn
+    }
+
+    get whiteBotState() {
+        if (this._turn === "white") return "off"
+        else if (this._turn === "whiteBot") return "on"
+        else if (this._turn === "black" || this._turn === "blackBot") return this._otherBotState
+        else return "off"
+    }
+
+    get blackBotState() {
+        if (this._turn === "black") return "off"
+        else if (this._turn === "blackBot") return "on"
+        else if (this._turn === "white" || this._turn === "whiteBot") return this._otherBotState
+        else return "off"
     }
 
     // State described as turn/otherBotState
@@ -232,9 +183,9 @@ export class TurnStateMachine {
             }
         }
 
-        const transition = transitions[this.#turn as ("white" | "whiteBot" | "black" | "blackBot")][this.#otherBotState]
-        this.#otherBotState = transition[1]
-        transition[0]()
+        const transition = transitions[this._turn as ("white" | "whiteBot" | "black" | "blackBot")][this._otherBotState]
+        this._otherBotState = transition[1]
+        await transition[0]()
     }
 
     async toggleBlackBot() {
@@ -263,9 +214,9 @@ export class TurnStateMachine {
             }
         }
 
-        const transition = transitions[this.#turn as ("white" | "whiteBot" | "black" | "blackBot")][this.#otherBotState]
-        this.#otherBotState = transition[1]
-        transition[0]()
+        const transition = transitions[this._turn as ("white" | "whiteBot" | "black" | "blackBot")][this._otherBotState]
+        this._otherBotState = transition[1]
+        await transition[0]()
     }
 
     async advanceTurn() {
@@ -296,8 +247,33 @@ export class TurnStateMachine {
             }
         }
 
-        const transition = transitions[this.#turn as ("white" | "whiteBot" | "black" | "blackBot")][this.#otherBotState]
-        this.#otherBotState = transition[1]
-        transition[0]()
+        const transition = transitions[this._turn as ("white" | "whiteBot" | "black" | "blackBot")][this._otherBotState]
+        this._otherBotState = transition[1]
+        await transition[0]()
     }
+}
+
+export let turnState = new TurnStateMachine();
+const appWebview = getCurrentWebviewWindow();
+
+export function cancelMove() {
+    appWebview.emit("cancel-move");
+}
+
+export async function autoplayMove() {
+    try {
+        await invoke("autoplay_move");
+        await turnState.advanceTurn();
+    } catch (e) {
+        // event canceled
+    }
+}
+
+export async function playMoveManually(moveToPlay: ChessMove) {
+    await invoke("play_move_manually", { moveToPlay });
+    await turnState.advanceTurn();
+}
+
+export async function restartGameState() {
+    await invoke("restart_game");
 }
