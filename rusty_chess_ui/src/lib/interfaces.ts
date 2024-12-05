@@ -36,6 +36,5 @@ type CurrentPlayer =
     | "black"
     | "blackBot"
     | { endgameMsg: string }
-    | { color: Color, promotionOptions: ChessMove[] };
 
 type BotState = "off" | "on"

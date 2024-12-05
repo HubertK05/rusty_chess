@@ -138,18 +138,24 @@ export class TurnStateMachine {
         this._otherBotState = "off"
     }
 
-    get turn() {
+    get turn(): CurrentPlayer {
         return this._turn
     }
 
-    get whiteBotState() {
+    get color(): Color | null {
+        if (this._turn === "white" || this._turn === "whiteBot" ) return "White"
+        else if (this._turn === "black" || this._turn === "blackBot") return "Black"
+        else return null
+    }
+
+    get whiteBotState(): BotState {
         if (this._turn === "white") return "off"
         else if (this._turn === "whiteBot") return "on"
         else if (this._turn === "black" || this._turn === "blackBot") return this._otherBotState
         else return "off"
     }
 
-    get blackBotState() {
+    get blackBotState(): BotState {
         if (this._turn === "black") return "off"
         else if (this._turn === "blackBot") return "on"
         else if (this._turn === "white" || this._turn === "whiteBot") return this._otherBotState
@@ -253,7 +259,16 @@ export class TurnStateMachine {
     }
 }
 
+export class PromotionState {
+    promotionData: ChessMove[] | null = $state(null)
+
+    get isPromoting() {
+        return !(this.promotionData === null)
+    }
+}
+
 export let turnState = new TurnStateMachine();
+export let promotionState = new PromotionState();
 const appWebview = getCurrentWebviewWindow();
 
 export function cancelMove() {
@@ -276,4 +291,28 @@ export async function playMoveManually(moveToPlay: ChessMove) {
 
 export async function restartGameState() {
     await invoke("restart_game");
+}
+
+export async function promotePawn(
+    option: PromotedPieceType,
+) {
+    const options = promotionState.promotionData
+    console.assert(options !== null, "Expected to be promoting");
+    if (options === null) return;
+
+    const playedMove = options.filter(
+        (move) =>
+            (move.move_type as { PromotionMove: PromotedPieceType })
+        .PromotionMove === option ||
+        (move.move_type as { PromotionCapture: PromotedPieceType })
+        .PromotionCapture === option
+    );
+
+    console.assert(
+        playedMove.length === 1,
+        `Expected one promotion move option to play, got ${playedMove}`
+    );
+
+    promotionState.promotionData = null;
+    await playMoveManually(playedMove[0]);
 }

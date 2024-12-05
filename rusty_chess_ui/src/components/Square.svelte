@@ -6,6 +6,7 @@
     pieceFromString,
     pieceToString,
     playMoveManually,
+    promotionState,
     turnState,
   } from "$lib/shared.svelte";
   import { invoke } from "@tauri-apps/api/core";
@@ -85,12 +86,7 @@
           turnState.turn === "black" || turnState.turn == "white",
           "Expected a player's turn during promotion, not bot"
         );
-        // const currentTurn: Color =
-        //   turnState.turn === "white" ? "White" : "Black";
-        // turnState.turn = {
-        //   promotionOptions: movesToPlay,
-        //   color: currentTurn,
-        // };
+        promotionState.promotionData = movesToPlay;
       }
 
       return;

@@ -8,6 +8,8 @@
     CurrentPlayerState,
     legalMoves,
     playMoveManually,
+    promotePawn,
+    promotionState,
     restartGameState,
     turnState,
   } from "../lib/shared.svelte";
@@ -19,26 +21,6 @@
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
-  }
-
-  async function promotePawn(
-    pieceType: PromotedPieceType,
-    color: Color,
-    promotionOptions: ChessMove[]
-  ) {
-    const playedMove = promotionOptions.filter(
-      (move) =>
-        (move.move_type as { PromotionMove: PromotedPieceType })
-          .PromotionMove === pieceType ||
-        (move.move_type as { PromotionCapture: PromotedPieceType })
-          .PromotionCapture === pieceType
-    );
-
-    console.assert(
-      playedMove.length === 1,
-      `Expected one promotion move option to play, got ${playedMove}`
-    );
-    await playMoveManually(playedMove[0]);
   }
 
   listen<BackendBoard>("update-board", (event) => {
@@ -97,7 +79,40 @@
         Restart game
       </button>
 
-      {#if (turnState.turn as CurrentPlayer) === "white" || (turnState.turn as CurrentPlayer) === "whiteBot"}
+      {#if promotionState.isPromoting}
+        <div
+          class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
+        >
+          <button onclick={async () => await promotePawn("Queen")}>
+            <img
+              src={`../src/assets/${turnState.color === "White" ? "wQ" : "bQ"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
+          <button onclick={async () => await promotePawn("Rook")}>
+            <img
+              src={`../src/assets/${turnState.color === "White" ? "wR" : "bR"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
+          <button onclick={async () => await promotePawn("Bishop")}>
+            <img
+              src={`../src/assets/${turnState.color === "White" ? "wB" : "bB"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
+          <button onclick={async () => await promotePawn("Knight")}>
+            <img
+              src={`../src/assets/${turnState.color === "White" ? "wN" : "bN"}.svg`}
+              alt="A chess piece"
+              class="w-full h-full"
+            />
+          </button>
+        </div>
+      {:else if (turnState.turn as CurrentPlayer) === "white" || (turnState.turn as CurrentPlayer) === "whiteBot"}
         <div
           class="bg-gray-300 text-black rounded-lg flex items-center justify-center py-2 row-span-2"
         >
@@ -114,71 +129,6 @@
           class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
         >
           {(turnState.turn as { endgameMsg: string }).endgameMsg}
-        </div>
-      {:else if (turnState.turn as { promotionOptions: ChessMove[]; color: Color }).color}
-        <div
-          class="text-gray-400 rounded-lg flex items-center justify-center py-2 row-span-2"
-        >
-          <button
-            onclick={async () =>
-              await promotePawn(
-                "Queen",
-                (turnState.turn as { color: Color }).color,
-                (turnState.turn as { promotionOptions: ChessMove[] })
-                  .promotionOptions
-              )}
-          >
-            <img
-              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wQ" : "bQ"}.svg`}
-              alt="A chess piece"
-              class="w-full h-full"
-            />
-          </button>
-          <button
-            onclick={async () =>
-              await promotePawn(
-                "Rook",
-                (turnState.turn as { color: Color }).color,
-                (turnState.turn as { promotionOptions: ChessMove[] })
-                  .promotionOptions
-              )}
-          >
-            <img
-              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wR" : "bR"}.svg`}
-              alt="A chess piece"
-              class="w-full h-full"
-            />
-          </button>
-          <button
-            onclick={async () =>
-              await promotePawn(
-                "Bishop",
-                (turnState.turn as { color: Color }).color,
-                (turnState.turn as { promotionOptions: ChessMove[] })
-                  .promotionOptions
-              )}
-          >
-            <img
-              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wB" : "bB"}.svg`}
-              alt="A chess piece"
-              class="w-full h-full"
-            />
-          </button>
-          <button
-            onclick={async () =>
-              await promotePawn(
-                "Knight",
-                (turnState.turn as { color: Color }).color,
-                (turnState.turn as { promotionOptions: ChessMove[] })
-                  .promotionOptions
-              )}
-          >
-            <img
-              src={`../src/assets/${(turnState.turn as { color: Color }).color === "White" ? "wN" : "bN"}.svg`}
-              alt="A chess piece"
-              class="w-full h-full"
-            />
-          </button>
         </div>
       {/if}
 
