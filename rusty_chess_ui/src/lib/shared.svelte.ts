@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
+import { setDebugMode } from "svelte-dnd-action"
 
 export const pieceFromString: (x: string) => ChessPiece = (pieceString) => {
     const pieceTable: Record<string, ChessPiece> = {

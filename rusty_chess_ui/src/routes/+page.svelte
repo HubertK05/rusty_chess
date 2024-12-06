@@ -13,7 +13,7 @@
     restartGameState,
     turnState,
   } from "../lib/shared.svelte";
-  import { dndzone } from "svelte-dnd-action";
+  import { dndzone, DRAGGED_ELEMENT_ID } from "svelte-dnd-action";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 

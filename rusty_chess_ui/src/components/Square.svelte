@@ -10,11 +10,12 @@
     turnState,
   } from "$lib/shared.svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { dndzone } from "svelte-dnd-action";
+  import { dndzone, TRIGGERS, type DndEvent } from "svelte-dnd-action";
 
   let { row, col }: { row: number; col: number } = $props();
 
   let items: DraggableChessPiece[] = $derived(board.board[row][col]);
+  const squareId: number = $derived(row * 8 + col);
 
   function getSquareStyle() {
     if (
@@ -29,57 +30,47 @@
     return await invoke("get_legal_moves");
   }
 
-  async function handleConsider(e: {
-    detail: {
-      items: DraggableChessPiece[];
-    };
-  }) {
-    const draggedItems = e.detail.items.filter((x) => x.isDndShadowItem);
-    if (draggedItems.find((x) => x.id === row * 8 + col)) {
+  async function handleConsider(e: DndEvent<DraggableChessPiece>) {
+    board.board[row][col] = e.items;
+    if (e.info.trigger === TRIGGERS.DRAG_STARTED) {
       legalMoves.moves = (await getLegalMoves()).filter(
         (move) => move.from[0] === col && move.from[1] === row
       );
     }
-
-    board.board[row][col] = e.detail.items;
   }
 
-  async function handleFinalize(e: {
-    detail: {
-      items: DraggableChessPiece[];
-    };
-  }) {
-    const pieceWasMoved = $state
-      .snapshot(board.board[row][col])
-      .filter((x) => x.isDndShadowItem && x.id !== row * 8 + col);
+  async function handleFinalize(e: DndEvent<DraggableChessPiece>) {
+    if (e.info.trigger !== TRIGGERS.DROPPED_INTO_ZONE) {
+      return;
+    }
+
+    if (squareId === +e.info.id) {
+      board.board[row][col] = e.items;
+      return;
+    }
+
+    const fromSquareId = +e.info.id;
+    const toSquareId = squareId;
 
     let movesToPlay: ChessMove[] = [];
-    if (pieceWasMoved.length !== 0) {
-      const from = pieceWasMoved[0].id;
-      const to = row * 8 + col;
-      movesToPlay = legalMoves.moves.filter(
-        (move) =>
-          move.from[1] * 8 + move.from[0] === from &&
-          move.to[1] * 8 + move.to[0] === to
+    movesToPlay = legalMoves.moves.filter((move) => {
+      return (
+        move.from[1] * 8 + move.from[0] === fromSquareId &&
+        move.to[1] * 8 + move.to[0] === toSquareId
       );
-      console.assert(
-        movesToPlay.length <= 1 || movesToPlay.length === 4,
-        `Expected at most one move to play, got ${movesToPlay}`
-      );
-    }
+    });
+    console.assert(
+      movesToPlay.length <= 1 || movesToPlay.length === 4,
+      `Expected at most one move to play, got ${movesToPlay}`
+    );
 
     legalMoves.moves = [];
 
     if (movesToPlay.length === 0 || movesToPlay.length === 4) {
-      if (e.detail.items.length === 0) return;
-
-      e.detail.items.forEach((item) => {
+      e.items.forEach((item) => {
         board.board[(item.id / 8) >> 0][item.id % 8 >> 0] = [item];
       });
-      const filteredItems = e.detail.items.filter(
-        (item) => item.id === row * 8 + col
-      );
-      board.board[row][col] = filteredItems;
+      board.board[row][col] = e.items.filter((item) => item.id === squareId);
 
       if (movesToPlay.length === 4) {
         console.assert(
@@ -94,16 +85,11 @@
 
     const moveToPlay = movesToPlay[0];
     if (board.board[row][col].length >= 2) {
-      e.detail.items.forEach((incoming) =>
-        board.board[row][col].find((current) => current.id === incoming.id)
-      );
-      board.board[row][col] = e.detail.items.filter(
-        (incoming) =>
-          board.board[row][col].find((current) => current.id === incoming.id)!
-            .isDndShadowItem === true
+      board.board[row][col] = e.items.filter(
+        (piece) => piece.id === +e.info.id
       );
     } else {
-      board.board[row][col] = e.detail.items;
+      board.board[row][col] = e.items;
     }
     await playMoveManually(moveToPlay);
   }
@@ -119,10 +105,10 @@
     dragDisabled: !(turnState.turn === "white" || turnState.turn === "black"),
   }}
   onconsider={(e) => {
-    handleConsider(e);
+    handleConsider(e.detail);
   }}
   onfinalize={(e) => {
-    handleFinalize(e);
+    handleFinalize(e.detail);
   }}
 >
   {#each board.board[row][col] as piece (piece.id)}
