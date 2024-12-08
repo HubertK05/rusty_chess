@@ -105,158 +105,141 @@ export let legalMoves: { moves: ChessMove[] } = $state({
 
 export let board = new BoardState();
 
+class Transition {
+    constructor(public newPlayer: () => Promise<void> | void, public newOtherBotState: BotState) {}
+}
+
+function isEndgameMsg(currentPlayer: CurrentPlayer): currentPlayer is { endgameMsg: string } {
+    return typeof currentPlayer === "object" && "endgameMsg" in currentPlayer;
+}
+
 export class TurnStateMachine {
-    _turn: CurrentPlayer = $state("white");
-    _otherBotState: BotState = $state("off");
+    #turn: CurrentPlayer = $state("white");
+    #otherBotState: BotState = $state("off");
 
     setWhite = () => {
-        this._turn = "white"
+        this.#turn = "white"
         cancelMove();
     }
 
     setWhiteBot = async () => {
-        this._turn = "whiteBot"
+        this.#turn = "whiteBot"
         await autoplayMove();
     }
 
     setBlack = () => {
-        this._turn = "black"
+        this.#turn = "black"
         cancelMove();
     }
 
     setBlackBot = async () => {
-        this._turn = "blackBot"
+        this.#turn = "blackBot"
         await autoplayMove();
     }
 
     endGame(msg: string) {
-        this._turn = { endgameMsg: msg }
+        this.#turn = { endgameMsg: msg }
         cancelMove();
     }
 
     restartGame() {
         this.setWhite()
-        this._otherBotState = "off"
+        this.#otherBotState = "off"
     }
 
     get turn(): CurrentPlayer {
-        return this._turn
+        return this.#turn
     }
 
     get color(): Color | null {
-        if (this._turn === "white" || this._turn === "whiteBot" ) return "White"
-        else if (this._turn === "black" || this._turn === "blackBot") return "Black"
+        if (this.#turn === "white" || this.#turn === "whiteBot" ) return "White"
+        else if (this.#turn === "black" || this.#turn === "blackBot") return "Black"
         else return null
     }
 
     get whiteBotState(): BotState {
-        if (this._turn === "white") return "off"
-        else if (this._turn === "whiteBot") return "on"
-        else if (this._turn === "black" || this._turn === "blackBot") return this._otherBotState
+        if (this.#turn === "white") return "off"
+        else if (this.#turn === "whiteBot") return "on"
+        else if (this.#turn === "black" || this.#turn === "blackBot") return this.#otherBotState
         else return "off"
     }
 
     get blackBotState(): BotState {
-        if (this._turn === "black") return "off"
-        else if (this._turn === "blackBot") return "on"
-        else if (this._turn === "white" || this._turn === "whiteBot") return this._otherBotState
+        if (this.#turn === "black") return "off"
+        else if (this.#turn === "blackBot") return "on"
+        else if (this.#turn === "white" || this.#turn === "whiteBot") return this.#otherBotState
         else return "off"
     }
 
-    // State described as turn/otherBotState
+    async transformState(transitions: Record<Player, Record<BotState, Transition>>) {
+        if (isEndgameMsg(this.#turn)) return;
+        const transition = transitions[this.#turn as Player][this.#otherBotState]
+        if (!transition) return;
+        this.#otherBotState = transition.newOtherBotState
+        await transition.newPlayer()
+    }
+
     async toggleWhiteBot() {
-        // white/- => whiteBot/-
-        // whiteBot/- => white/-
-        // black/off => black/on
-        // black/on => black/off
-        // blackBot/off => blackBot/on
-        // blackBot/on => blackBot/off
-        const transitions: Record<("white" | "whiteBot" | "black" | "blackBot"), Record<BotState, any[]>> = {
+        this.transformState({
             "white": {
-                "off": [this.setWhiteBot, "off"],
-                "on": [this.setWhiteBot, "on"],
+                "off": new Transition(this.setWhiteBot, "off"),
+                "on": new Transition(this.setWhiteBot, "on"),
             },
             "whiteBot": {
-                "off": [this.setWhite, "off"],
-                "on": [this.setWhite, "on"],
+                "off": new Transition(this.setWhite, "off"),
+                "on": new Transition(this.setWhite, "on"),
             },
             "black": {
-                "off": [this.setBlack, "on"],
-                "on": [this.setBlack, "off"],
+                "off": new Transition(this.setBlack, "on"),
+                "on": new Transition(this.setBlack, "off"),
             },
             "blackBot": {
-                "off": [this.setBlackBot, "on"],
-                "on": [this.setBlackBot, "off"],
+                "off": new Transition(this.setBlackBot, "on"),
+                "on": new Transition(this.setBlackBot, "off"),
             }
-        }
-
-        const transition = transitions[this._turn as ("white" | "whiteBot" | "black" | "blackBot")][this._otherBotState]
-        this._otherBotState = transition[1]
-        await transition[0]()
+        })
     }
 
     async toggleBlackBot() {
-        // black/- => blackBot/-
-        // blackBot/- => black/-
-        // white/off => white/on
-        // white/on => white/off
-        // whiteBot/off => whiteBot/on
-        // whiteBot/on => whiteBot/off
-        const transitions: Record<("white" | "whiteBot" | "black" | "blackBot"), Record<BotState, any[]>> = {
+        this.transformState({
             "white": {
-                "off": [this.setWhite, "on"],
-                "on": [this.setWhite, "off"],
+                "off": new Transition(this.setWhite, "on"),
+                "on": new Transition(this.setWhite, "off"),
             },
             "whiteBot": {
-                "off": [this.setWhiteBot, "on"],
-                "on": [this.setWhiteBot, "off"],
+                "off": new Transition(this.setWhiteBot, "on"),
+                "on": new Transition(this.setWhiteBot, "off"),
             },
             "black": {
-                "off": [this.setBlackBot, "off"],
-                "on": [this.setBlackBot, "on"],
+                "off": new Transition(this.setBlackBot, "off"),
+                "on": new Transition(this.setBlackBot, "on"),
             },
             "blackBot": {
-                "off": [this.setBlack, "off"],
-                "on": [this.setBlack, "on"],
+                "off": new Transition(this.setBlack, "off"),
+                "on": new Transition(this.setBlack, "on"),
             }
-        }
-
-        const transition = transitions[this._turn as ("white" | "whiteBot" | "black" | "blackBot")][this._otherBotState]
-        this._otherBotState = transition[1]
-        await transition[0]()
+        })
     }
 
     async advanceTurn() {
-        // white/off => black/off
-        // white/on => blackBot/off
-        // whiteBot/off => black/on
-        // whiteBot/on => blackBot/on
-        // black/off => white/off
-        // black/on => whiteBot/off
-        // blackBot/off => white/on
-        // blackBot/on => whiteBot/on
-        const transitions: Record<("white" | "whiteBot" | "black" | "blackBot"), Record<BotState, any[]>> = {
+        this.transformState({
             "white": {
-                "off": [this.setBlack, "off"],
-                "on": [this.setBlackBot, "off"],
+                "off": new Transition(this.setBlack, "off"),
+                "on": new Transition(this.setBlackBot, "off"),
             },
             "whiteBot": {
-                "off": [this.setBlack, "on"],
-                "on": [this.setBlackBot, "on"],
+                "off": new Transition(this.setBlack, "on"),
+                "on": new Transition(this.setBlackBot, "on"),
             },
             "black": {
-                "off": [this.setWhite, "off"],
-                "on": [this.setWhiteBot, "off"],
+                "off": new Transition(this.setWhite, "off"),
+                "on": new Transition(this.setWhiteBot, "off"),
             },
             "blackBot": {
-                "off": [this.setWhite, "on"],
-                "on": [this.setWhiteBot, "on"],
+                "off": new Transition(this.setWhite, "on"),
+                "on": new Transition(this.setWhiteBot, "on"),
             }
-        }
-
-        const transition = transitions[this._turn as ("white" | "whiteBot" | "black" | "blackBot")][this._otherBotState]
-        this._otherBotState = transition[1]
-        await transition[0]()
+        })
     }
 }
 

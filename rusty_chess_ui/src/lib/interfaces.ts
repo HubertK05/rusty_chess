@@ -30,11 +30,9 @@ interface ChessMove {
     to: number[],
 }
 
+type Player = "white" | "whiteBot" | "black" | "blackBot"
+
 type CurrentPlayer =
-    | "white"
-    | "whiteBot"
-    | "black"
-    | "blackBot"
-    | { endgameMsg: string }
+    Player | { endgameMsg: string }
 
 type BotState = "off" | "on"
