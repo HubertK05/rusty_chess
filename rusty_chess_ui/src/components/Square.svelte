@@ -1,15 +1,13 @@
 <script lang="ts">
   import {
-    autoplayMove,
     board,
+    getLegalMoves,
     legalMoves,
-    pieceFromString,
     pieceToString,
     playMoveManually,
     promotionState,
     turnState,
   } from "$lib/shared.svelte";
-  import { invoke } from "@tauri-apps/api/core";
   import { dndzone, TRIGGERS, type DndEvent } from "svelte-dnd-action";
 
   let { row, col }: { row: number; col: number } = $props();
@@ -26,10 +24,6 @@
     return (row + col) % 2 === 0 ? "bg-yellow-300" : "bg-orange-800";
   }
 
-  async function getLegalMoves(): Promise<ChessMove[]> {
-    return await invoke("get_legal_moves");
-  }
-
   async function handleConsider(e: DndEvent<DraggableChessPiece>) {
     board.board[row][col] = e.items;
     if (e.info.trigger === TRIGGERS.DRAG_STARTED) {
@@ -40,6 +34,11 @@
   }
 
   async function handleFinalize(e: DndEvent<DraggableChessPiece>) {
+    await handleFinalizeInner(e);
+    legalMoves.moves = [];
+  }
+
+  async function handleFinalizeInner(e: DndEvent<DraggableChessPiece>) {
     if (e.info.trigger !== TRIGGERS.DROPPED_INTO_ZONE) {
       return;
     }
@@ -63,8 +62,6 @@
       movesToPlay.length <= 1 || movesToPlay.length === 4,
       `Expected at most one move to play, got ${movesToPlay}`
     );
-
-    legalMoves.moves = [];
 
     if (movesToPlay.length === 0 || movesToPlay.length === 4) {
       e.items.forEach((item) => {

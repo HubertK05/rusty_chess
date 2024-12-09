@@ -104,11 +104,7 @@ impl AppState {
 }
 
 #[tauri::command]
-async fn autoplay_move(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-) -> Result<ChessMove, String> {
-    println!("Autoplaying move");
+async fn autoplay_move(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
 
@@ -123,7 +119,6 @@ async fn autoplay_move(
             .choose_weighted(&mut rng, |(_, popularity)| *popularity)
             .unwrap();
         let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
-        println!("played book move");
 
         Some(res)
     } else {
@@ -134,7 +129,6 @@ async fn autoplay_move(
         )
     };
 
-    println!("Checking cancel");
     let is_canceled = {
         state
             .cancel_channel
@@ -148,15 +142,15 @@ async fn autoplay_move(
     };
 
     if is_canceled {
-        println!("Canceled");
-        return Err("Autoplay move canceled".into());
+        return Ok(());
     }
 
     if let Some(m) = chosen_move {
         state.play_move_loudly(app, m).await?;
+        Ok(())
+    } else {
+        return Err("Failed to choose move".into());
     }
-
-    return chosen_move.ok_or("Failed to choose move".into());
 }
 
 #[tauri::command]

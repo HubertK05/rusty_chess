@@ -1,21 +1,13 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api/core";
   import Square from "../components/Square.svelte";
   import {
-    autoplayMove,
     board,
-    cancelMove,
-    CurrentPlayerState,
-    legalMoves,
-    playMoveManually,
     promotePawn,
     promotionState,
     restartGameState,
     turnState,
   } from "../lib/shared.svelte";
-  import { dndzone, DRAGGED_ELEMENT_ID } from "svelte-dnd-action";
   import { listen } from "@tauri-apps/api/event";
-  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 
   let reversed = $state(false);
 

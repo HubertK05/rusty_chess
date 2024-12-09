@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
-import { setDebugMode } from "svelte-dnd-action"
 
 export const pieceFromString: (x: string) => ChessPiece = (pieceString) => {
     const pieceTable: Record<string, ChessPiece> = {
@@ -33,7 +32,6 @@ export class BoardState {
     _board: Board = $state([]);
 
     constructor() {
-        // TODO: Can I keep DRY without using constructors that rely on other methods?
         this.restart()
     }
 
@@ -84,18 +82,6 @@ export class CurrentBotState {
             this._state = "off"
         }
         console.log(this._state)
-    }
-}
-
-export class CurrentPlayerState {
-    _turn: CurrentPlayer = $state("white")
-    
-    get turn() {
-        return this._turn;
-    }
-    
-    set turn(newTurn: CurrentPlayer) {
-        this._turn = newTurn;
     }
 }
 
@@ -260,12 +246,8 @@ export function cancelMove() {
 }
 
 export async function autoplayMove() {
-    try {
-        await invoke("autoplay_move");
-        await turnState.advanceTurn();
-    } catch (e) {
-        // event canceled
-    }
+    await invoke("autoplay_move");
+    await turnState.advanceTurn();
 }
 
 export async function playMoveManually(moveToPlay: ChessMove) {
@@ -275,6 +257,10 @@ export async function playMoveManually(moveToPlay: ChessMove) {
 
 export async function restartGameState() {
     await invoke("restart_game");
+}
+
+export async function getLegalMoves(): Promise<ChessMove[]> {
+    return await invoke("get_legal_moves");
 }
 
 export async function promotePawn(
