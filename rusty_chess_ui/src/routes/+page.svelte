@@ -10,6 +10,9 @@
   import { listen } from "@tauri-apps/api/event";
 
   let reversed = $state(false);
+  let settings = $state(false);
+  let theme = $state("dark");
+  let analyzeDepth = $state(5);
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
@@ -37,6 +40,34 @@
   });
 </script>
 
+<header class="flex justify-end absolute w-full h-10">
+  <button
+    class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400"
+    onclick={() => (settings = !settings)}>Settings</button
+  >
+</header>
+{#if settings}
+  <div class="absolute w-full h-full flex items-center justify-center">
+    <div
+      class="bg-gray-500 w-[36rem] h-[36rem] rounded-3xl border-4 flex items-center justify-center"
+    >
+      <div class="w-[30rem] h-[30rem]">
+        <p>Theme:</p>
+        <input type="radio" bind:group={theme} value="dark" />
+        <span>Dark</span><br />
+        <input type="radio" bind:group={theme} value="light" />
+        <span>Light</span><br />
+        <p>Analyzed moves</p>
+        <input type="range" min="1" max="10" bind:value={analyzeDepth} />
+        <span>{analyzeDepth}</span><br />
+        <button
+          class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400"
+          onclick={() => (settings = false)}>Close</button
+        >
+      </div>
+    </div>
+  </div>
+{/if}
 <main class="flex justify-center items-center h-screen">
   <div class="flex">
     <div>
