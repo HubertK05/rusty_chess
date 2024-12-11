@@ -263,6 +263,14 @@ export async function getLegalMoves(): Promise<ChessMove[]> {
     return await invoke("get_legal_moves");
 }
 
+export async function updateAppSettings(newSettings: AppSettings) {
+    await invoke("update_settings", { newSettings });
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+    return await invoke("get_settings");
+}
+
 export async function promotePawn(
     option: PromotedPieceType,
 ) {

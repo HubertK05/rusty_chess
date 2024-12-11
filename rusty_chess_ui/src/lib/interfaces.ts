@@ -36,3 +36,10 @@ type CurrentPlayer =
     Player | { endgameMsg: string }
 
 type BotState = "off" | "on"
+
+interface AppSettings {
+    eval_print: boolean,
+    pruning: boolean,
+    positional_value_factor: number,
+    search_depth: number,
+}
