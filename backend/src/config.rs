@@ -1,7 +1,7 @@
-use config::{ConfigError, Config};
-use serde::Deserialize;
+use config::{Config, ConfigError};
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Clone, Copy)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
 pub struct AppSettings {
     pub eval_print: bool,
     pub pruning: bool,

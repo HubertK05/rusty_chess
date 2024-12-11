@@ -17,7 +17,7 @@ struct AppState {
     board: Mutex<Board>,
     repetition_map: Mutex<BTreeMap<u64, u8>>,
     opening_book: OpeningBook,
-    app_settings: AppSettings,
+    app_settings: Mutex<AppSettings>,
     cancel_channel: OnceLock<Mutex<tauri::async_runtime::Receiver<()>>>,
 }
 
@@ -125,7 +125,7 @@ async fn autoplay_move(app: AppHandle, state: tauri::State<'_, AppState>) -> Res
         backend::chess_bot::choose_move(
             &board,
             state.repetition_map.lock().await.clone(),
-            state.app_settings,
+            *state.app_settings.lock().await,
         )
     };
 
@@ -174,6 +174,20 @@ async fn restart_game(state: tauri::State<'_, AppState>) -> Result<(), ()> {
     Ok(())
 }
 
+#[tauri::command]
+async fn update_settings(
+    state: tauri::State<'_, AppState>,
+    new_settings: AppSettings,
+) -> Result<(), ()> {
+    *state.app_settings.lock().await = new_settings;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_settings(state: tauri::State<'_, AppState>) -> Result<AppSettings, ()> {
+    return Ok(*state.app_settings.lock().await);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -182,7 +196,7 @@ pub fn run() {
             board: Mutex::new(Board::new_game()),
             repetition_map: Mutex::new(BTreeMap::new()),
             opening_book: OpeningBook::from_file("opening_book.txt"),
-            app_settings: AppSettings::get_from_file("settings.toml").unwrap(),
+            app_settings: Mutex::new(AppSettings::get_from_file("settings.toml").unwrap()),
             cancel_channel: OnceLock::new(),
         })
         .setup(|app| {
@@ -201,6 +215,8 @@ pub fn run() {
             autoplay_move,
             get_legal_moves,
             restart_game,
+            update_settings,
+            get_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
