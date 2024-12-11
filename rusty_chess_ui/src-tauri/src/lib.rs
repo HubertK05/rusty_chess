@@ -122,10 +122,12 @@ async fn autoplay_move(app: AppHandle, state: tauri::State<'_, AppState>) -> Res
 
         Some(res)
     } else {
+        let app_settings = { state.app_settings.lock().await.clone() };
+
         backend::chess_bot::choose_move(
             &board,
             state.repetition_map.lock().await.clone(),
-            *state.app_settings.lock().await,
+            app_settings,
         )
     };
 
