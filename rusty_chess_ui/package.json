@@ -13,8 +13,13 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-shell": "^2"
+    "@tauri-apps/plugin-shell": "^2",
+    "flowbite": "^2.5.2",
+    "flowbite-svelte": "^0.47.4",
+    "flowbite-svelte-icons": "^2.0.2",
+    "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.5",
