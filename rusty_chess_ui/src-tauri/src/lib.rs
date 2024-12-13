@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, sync::OnceLock};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, OnceLock},
+};
 
 use backend::{
     board_setup::models::{Board, FenNotation},
@@ -8,8 +11,9 @@ use backend::{
     opening_book::{move_parser::parse_move, OpeningBook},
 };
 use rand::{seq::SliceRandom, thread_rng};
+use serde::{Deserialize, Serialize};
 use tauri::{
-    async_runtime::{channel, Mutex, Receiver, Sender},
+    async_runtime::{spawn, Mutex},
     AppHandle, Emitter, Listener, Manager,
 };
 
@@ -18,12 +22,18 @@ struct AppState {
     repetition_map: Mutex<BTreeMap<u64, u8>>,
     opening_book: OpeningBook,
     app_settings: Mutex<AppSettings>,
-    cancel_channel: OnceLock<Mutex<tauri::async_runtime::Receiver<()>>>,
+    cancel_counter: OnceLock<Arc<Mutex<u32>>>,
 }
 
 enum GameOutcome {
     Ongoing,
     Done(String),
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+enum CancelResult {
+    Canceled,
+    NotCanceled,
 }
 
 impl AppState {
@@ -104,14 +114,17 @@ impl AppState {
 }
 
 #[tauri::command]
-async fn autoplay_move(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn autoplay_move(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<CancelResult, String> {
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
 
     let board = board_guard.clone();
     drop(board_guard);
 
-    let _ = { state.cancel_channel.get().unwrap().lock().await.try_recv() };
+    let starting_cancel_count = { *state.cancel_counter.get().unwrap().lock().await };
 
     let chosen_move = if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
         let mut rng = thread_rng();
@@ -122,34 +135,26 @@ async fn autoplay_move(app: AppHandle, state: tauri::State<'_, AppState>) -> Res
 
         Some(res)
     } else {
+        let repetition_map = state.repetition_map.lock().await.clone();
         let app_settings = { state.app_settings.lock().await.clone() };
 
-        backend::chess_bot::choose_move(
-            &board,
-            state.repetition_map.lock().await.clone(),
-            app_settings,
-        )
+        let thread = std::thread::spawn(move || {
+            backend::chess_bot::choose_move(&board, repetition_map, app_settings)
+        });
+        thread.join().unwrap()
     };
 
-    let is_canceled = {
-        state
-            .cancel_channel
-            .get()
-            .unwrap()
-            .lock()
-            .await
-            .try_recv()
-            .ok()
-            .is_some()
-    };
+    let is_canceled =
+        { *state.cancel_counter.get().unwrap().lock().await != starting_cancel_count };
 
     if is_canceled {
-        return Ok(());
+        println!("Canceled");
+        return Ok(CancelResult::Canceled);
     }
 
     if let Some(m) = chosen_move {
         state.play_move_loudly(app, m).await?;
-        Ok(())
+        Ok(CancelResult::NotCanceled)
     } else {
         return Err("Failed to choose move".into());
     }
@@ -199,16 +204,19 @@ pub fn run() {
             repetition_map: Mutex::new(BTreeMap::new()),
             opening_book: OpeningBook::from_file("opening_book.txt"),
             app_settings: Mutex::new(AppSettings::get_from_file("settings.toml").unwrap()),
-            cancel_channel: OnceLock::new(),
+            cancel_counter: OnceLock::new(),
         })
         .setup(|app| {
-            let (sender, receiver): (Sender<()>, Receiver<()>) = channel(1);
+            let counter = Arc::new(Mutex::new(0));
             app.state::<AppState>()
-                .cancel_channel
-                .set(Mutex::new(receiver))
+                .cancel_counter
+                .set(Arc::clone(&counter))
                 .expect("Attempted to set the channel more than once");
             app.listen("cancel-move", move |_| {
-                let _ = sender.try_send(());
+                let value = counter.clone();
+                spawn(async move {
+                    *value.lock().await += 1;
+                });
             });
             Ok(())
         })

@@ -43,3 +43,5 @@ interface AppSettings {
     positional_value_factor: number,
     search_depth: number,
 }
+
+type CancelResult = "Canceled" | "NotCanceled"

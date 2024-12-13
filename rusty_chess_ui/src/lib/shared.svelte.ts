@@ -246,8 +246,12 @@ export function cancelMove() {
 }
 
 export async function autoplayMove() {
-    await invoke("autoplay_move");
-    await turnState.advanceTurn();
+    const res = await invoke("autoplay_move");
+    if (res as CancelResult) {
+        if (res === "NotCanceled") await turnState.advanceTurn();
+    } else {
+        console.error(res);
+    }
 }
 
 export async function playMoveManually(moveToPlay: ChessMove) {
