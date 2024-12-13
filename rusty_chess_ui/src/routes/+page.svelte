@@ -12,6 +12,7 @@
   } from "../lib/shared.svelte";
   import { listen } from "@tauri-apps/api/event";
   import { Button, DarkMode, Label, Modal, Range } from "flowbite-svelte";
+  import { IconSolid } from "flowbite-svelte-icons";
 
   let reversed = $state(false);
   let settings: AppSettings | null = $state(null);
@@ -40,20 +41,43 @@
   listen<string>("end-game", (event) => {
     turnState.endGame(event.payload);
   });
-
-  onMount(async () => {
-    settings = await getAppSettings();
-  });
 </script>
 
-<header class="flex justify-end absolute w-full h-10">
+<header class="flex justify-end absolute w-full">
   <DarkMode />
   <button
-    class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400"
+    type="button"
+    class="h-100% text-white rounded-lg px-2 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+    color="none"
+    aria-label="Settings"
     onclick={async () => {
       settings = await getAppSettings();
-    }}>Settings</button
-  >
+    }}
+    ><svg
+      class="w-[24px] h-[24px] text-gray-800 dark:text-white"
+      aria-hidden="true"
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1"
+        d="M21 13v-2a1 1 0 0 0-1-1h-.757l-.707-1.707.535-.536a1 1 0 0 0 0-1.414l-1.414-1.414a1 1 0 0 0-1.414 0l-.536.535L14 4.757V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v.757l-1.707.707-.536-.535a1 1 0 0 0-1.414 0L4.929 6.343a1 1 0 0 0 0 1.414l.536.536L4.757 10H4a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h.757l.707 1.707-.535.536a1 1 0 0 0 0 1.414l1.414 1.414a1 1 0 0 0 1.414 0l.536-.535 1.707.707V20a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-.757l1.707-.708.536.536a1 1 0 0 0 1.414 0l1.414-1.414a1 1 0 0 0 0-1.414l-.535-.536.707-1.707H20a1 1 0 0 0 1-1Z"
+      />
+      <path
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="1"
+        d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+      />
+    </svg>
+  </button>
 </header>
 
 {#if settings}
@@ -98,9 +122,11 @@
   </Modal>
 {/if}
 
-<main class="flex justify-center items-center h-screen">
+<main
+  class="bg-gray-300 dark:bg-gray-900 flex justify-center items-center h-screen"
+>
   <div class="flex">
-    <div>
+    <div class="shadow-xl">
       {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
         <div class="flex flex-row">
           {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
@@ -111,17 +137,17 @@
     </div>
 
     <div class="grid gap-4 w-64 ml-4 grid-rows-[1fr_1fr_2fr_1fr_1fr]">
-      <button
-        class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400"
+      <Button
+        color="light"
         onclick={() => {
           reversed = !reversed;
         }}
       >
         Reverse board
-      </button>
+      </Button>
 
-      <button
-        class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400"
+      <Button
+        color="light"
         onclick={async () => {
           reversed = false;
           turnState.restartGame();
@@ -131,7 +157,7 @@
         }}
       >
         Restart game
-      </button>
+      </Button>
 
       {#if promotionState.isPromoting}
         <div class="rounded-lg flex items-center justify-center">
@@ -168,7 +194,7 @@
         </div>
       {:else if (turnState.turn as CurrentPlayer) === "white" || (turnState.turn as CurrentPlayer) === "whiteBot"}
         <div
-          class="bg-gray-300 text-black rounded-lg flex items-center justify-center"
+          class="bg-white text-black rounded-lg flex items-center justify-center"
         >
           White's turn
         </div>
@@ -184,25 +210,25 @@
         </div>
       {/if}
 
-      <button
-        class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400 disabled:opacity-50"
+      <Button
+        color="light"
         onclick={async () => {
           await turnState.toggleWhiteBot();
         }}
         disabled={promotionState.isPromoting}
       >
         White's bot ({turnState.whiteBotState})
-      </button>
+      </Button>
 
-      <button
-        class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400 disabled:opacity-50"
+      <Button
+        color="light"
         onclick={async () => {
           await turnState.toggleBlackBot();
         }}
         disabled={promotionState.isPromoting}
       >
         Black's bot ({turnState.blackBotState})
-      </button>
+      </Button>
     </div>
   </div>
 </main>
