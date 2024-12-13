@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import Square from "../components/Square.svelte";
   import {
     board,
@@ -10,10 +11,10 @@
     updateAppSettings,
   } from "../lib/shared.svelte";
   import { listen } from "@tauri-apps/api/event";
+  import { Button, DarkMode, Label, Modal, Range } from "flowbite-svelte";
 
   let reversed = $state(false);
   let settings: AppSettings | null = $state(null);
-  let theme = $state("dark");
 
   function generate_series(n: number) {
     return Array.from({ length: n }, (_, i) => i);
@@ -39,9 +40,14 @@
   listen<string>("end-game", (event) => {
     turnState.endGame(event.payload);
   });
+
+  onMount(async () => {
+    settings = await getAppSettings();
+  });
 </script>
 
 <header class="flex justify-end absolute w-full h-10">
+  <DarkMode />
   <button
     class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400"
     onclick={async () => {
@@ -51,46 +57,45 @@
 </header>
 
 {#if settings}
-  <div class="absolute w-full h-full flex items-center justify-center">
-    <div
-      class="bg-gray-500 w-[36rem] h-[36rem] rounded-3xl border-4 flex items-center justify-center"
-    >
-      <div class="w-[30rem] h-[30rem]">
-        <p>Theme:</p>
-        <input type="radio" bind:group={theme} value="dark" />
-        <span>Dark</span><br />
-        <input type="radio" bind:group={theme} value="light" />
-        <span>Light</span><br />
-        <p>Analyzed moves</p>
-        <input
-          type="range"
-          min="1"
-          max="10"
-          bind:value={settings.search_depth}
-        />
-        <span>{settings.search_depth}</span><br />
-        <p>Positional value factor</p>
-        <input
-          type="range"
-          min="0"
-          max="100"
-          bind:value={settings.positional_value_factor}
-        />
-        <span>{settings.positional_value_factor}</span><br />
-        <button
-          class="bg-gray-500 border-2 border-gray-700 rounded-lg px-4 hover:border-gray-400"
-          onclick={async () => {
-            console.assert(
-              settings !== null,
-              "Expected present settings when saving them"
-            );
-            if (settings) await updateAppSettings(settings);
-            settings = null;
-          }}>Save</button
-        >
-      </div>
+  <Modal
+    open={settings !== null}
+    outsideclose
+    on:close={() => {
+      settings = null;
+    }}
+  >
+    <div class="mb-6">
+      <Label for="default-input" class="block mb-2">Search depth</Label>
+      <Range
+        id="pos-val-factor"
+        min="1"
+        max="10"
+        bind:value={settings.search_depth}
+      />
+      <p>Value: {settings.search_depth}</p>
     </div>
-  </div>
+    <div class="mb-6">
+      <Label for="small-input" class="block mb-2">Positional value factor</Label
+      >
+      <Range
+        id="pos-val-factor"
+        min="0"
+        max="100"
+        bind:value={settings.positional_value_factor}
+      />
+      <p>Value: {settings.positional_value_factor}</p>
+    </div>
+    <Button
+      onclick={async () => {
+        console.assert(
+          settings !== null,
+          "Expected present settings when saving them"
+        );
+        if (settings) await updateAppSettings(settings);
+        settings = null;
+      }}>Save</Button
+    >
+  </Modal>
 {/if}
 
 <main class="flex justify-center items-center h-screen">
