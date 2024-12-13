@@ -12,7 +12,6 @@
   } from "../lib/shared.svelte";
   import { listen } from "@tauri-apps/api/event";
   import { Button, DarkMode, Label, Modal, Range } from "flowbite-svelte";
-  import { IconSolid } from "flowbite-svelte-icons";
 
   let reversed = $state(false);
   let settings: AppSettings | null = $state(null);
@@ -47,14 +46,14 @@
   <DarkMode />
   <button
     type="button"
-    class="h-100% text-white rounded-lg px-2 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+    class="text-white rounded-lg px-2 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
     color="none"
     aria-label="Settings"
     onclick={async () => {
       settings = await getAppSettings();
     }}
     ><svg
-      class="w-[24px] h-[24px] text-gray-800 dark:text-white"
+      class="w-6 h-6 text-gray-800 dark:text-white"
       aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
       width="24"
@@ -123,10 +122,10 @@
 {/if}
 
 <main
-  class="bg-gray-300 dark:bg-gray-900 flex justify-center items-center h-screen"
+  class="bg-gray-300 dark:bg-[#222] flex justify-center items-center h-screen"
 >
   <div class="flex">
-    <div class="shadow-xl">
+    <div class="shadow-xl dark:shadow-none">
       {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
         <div class="flex flex-row">
           {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
@@ -138,7 +137,7 @@
 
     <div class="grid gap-4 w-64 ml-4 grid-rows-[1fr_1fr_2fr_1fr_1fr]">
       <Button
-        color="light"
+        color="alternative"
         onclick={() => {
           reversed = !reversed;
         }}
@@ -147,7 +146,7 @@
       </Button>
 
       <Button
-        color="light"
+        color="alternative"
         onclick={async () => {
           reversed = false;
           turnState.restartGame();
@@ -211,7 +210,7 @@
       {/if}
 
       <Button
-        color="light"
+        color="alternative"
         onclick={async () => {
           await turnState.toggleWhiteBot();
         }}
@@ -221,7 +220,7 @@
       </Button>
 
       <Button
-        color="light"
+        color="alternative"
         onclick={async () => {
           await turnState.toggleBlackBot();
         }}
