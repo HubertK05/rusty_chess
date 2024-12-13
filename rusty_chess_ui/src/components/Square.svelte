@@ -94,7 +94,7 @@
 
 <div
   class={`
-    w-16 h-16 overflow-hidden ${getSquareStyle()}
+    w-10 h-10 sm:w-16 sm:h-16 overflow-hidden ${getSquareStyle()}
     `}
   use:dndzone={{
     items,

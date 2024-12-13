@@ -124,8 +124,8 @@
 <main
   class="bg-gray-300 dark:bg-[#222] flex justify-center items-center h-screen"
 >
-  <div class="flex">
-    <div class="shadow-xl dark:shadow-none">
+  <div class="flex flex-col lg:flex-row">
+    <div class="shadow-xl dark:shadow-none mb-4 lg:mb-0 lg:mr-4">
       {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
         <div class="flex flex-row">
           {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
@@ -135,7 +135,9 @@
       {/each}
     </div>
 
-    <div class="grid gap-4 w-64 ml-4 grid-rows-[1fr_1fr_2fr_1fr_1fr]">
+    <div
+      class="grid gap-2 sm:gap-4 w-full lg:w-64 grid-rows-[1fr_1fr_2fr_1fr_1fr] sm:grid-rows-[1fr_1fr_2fr_1fr_1fr]"
+    >
       <Button
         color="alternative"
         onclick={() => {
