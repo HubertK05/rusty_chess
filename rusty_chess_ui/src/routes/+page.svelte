@@ -165,28 +165,28 @@
           <div>
             <button onclick={async () => await promotePawn("Queen")}>
               <img
-                src={`../src/assets/${turnState.color === "White" ? "wQ" : "bQ"}.svg`}
+                src={`${turnState.color === "White" ? "wQ" : "bQ"}.svg`}
                 alt="A chess piece"
                 class="w-full h-full"
               />
             </button>
             <button onclick={async () => await promotePawn("Rook")}>
               <img
-                src={`../src/assets/${turnState.color === "White" ? "wR" : "bR"}.svg`}
+                src={`${turnState.color === "White" ? "wR" : "bR"}.svg`}
                 alt="A chess piece"
                 class="w-full h-full"
               />
             </button>
             <button onclick={async () => await promotePawn("Bishop")}>
               <img
-                src={`../src/assets/${turnState.color === "White" ? "wB" : "bB"}.svg`}
+                src={`${turnState.color === "White" ? "wB" : "bB"}.svg`}
                 alt="A chess piece"
                 class="w-full h-full"
               />
             </button>
             <button onclick={async () => await promotePawn("Knight")}>
               <img
-                src={`../src/assets/${turnState.color === "White" ? "wN" : "bN"}.svg`}
+                src={`${turnState.color === "White" ? "wN" : "bN"}.svg`}
                 alt="A chess piece"
                 class="w-full h-full"
               />

@@ -110,7 +110,7 @@
 >
   {#each board.board[row][col] as piece (piece.id)}
     <img
-      src={`../src/assets/${pieceToString(piece.piece)}.svg`}
+      src={`${pieceToString(piece.piece)}.svg`}
       alt="A chess piece"
       class="w-full h-full"
     />
