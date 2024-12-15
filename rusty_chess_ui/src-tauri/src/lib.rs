@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     sync::{Arc, OnceLock},
 };
 
@@ -14,14 +14,15 @@ use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
 use tauri::{
     async_runtime::{spawn, Mutex},
+    path::BaseDirectory,
     AppHandle, Emitter, Listener, Manager,
 };
 
 struct AppState {
     board: Mutex<Board>,
     repetition_map: Mutex<BTreeMap<u64, u8>>,
-    opening_book: OpeningBook,
-    app_settings: Mutex<AppSettings>,
+    opening_book: OnceLock<OpeningBook>,
+    app_settings: OnceLock<Mutex<AppSettings>>,
     cancel_counter: OnceLock<Arc<Mutex<u32>>>,
 }
 
@@ -126,23 +127,24 @@ async fn autoplay_move(
 
     let starting_cancel_count = { *state.cancel_counter.get().unwrap().lock().await };
 
-    let chosen_move = if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
-        let mut rng = thread_rng();
-        let san = move_vec
-            .choose_weighted(&mut rng, |(_, popularity)| *popularity)
-            .unwrap();
-        let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
+    let chosen_move =
+        if let Some(move_vec) = state.opening_book.get().unwrap().0.get(&fen.to_draw_fen()) {
+            let mut rng = thread_rng();
+            let san = move_vec
+                .choose_weighted(&mut rng, |(_, popularity)| *popularity)
+                .unwrap();
+            let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
 
-        Some(res)
-    } else {
-        let repetition_map = state.repetition_map.lock().await.clone();
-        let app_settings = { state.app_settings.lock().await.clone() };
+            Some(res)
+        } else {
+            let repetition_map = state.repetition_map.lock().await.clone();
+            let app_settings = { state.app_settings.get().unwrap().lock().await.clone() };
 
-        let thread = std::thread::spawn(move || {
-            backend::chess_bot::choose_move(&board, repetition_map, app_settings)
-        });
-        thread.join().unwrap()
-    };
+            let thread = std::thread::spawn(move || {
+                backend::chess_bot::choose_move(&board, repetition_map, app_settings)
+            });
+            thread.join().unwrap()
+        };
 
     let is_canceled =
         { *state.cancel_counter.get().unwrap().lock().await != starting_cancel_count };
@@ -186,13 +188,13 @@ async fn update_settings(
     state: tauri::State<'_, AppState>,
     new_settings: AppSettings,
 ) -> Result<(), ()> {
-    *state.app_settings.lock().await = new_settings;
+    *state.app_settings.get().unwrap().lock().await = new_settings;
     Ok(())
 }
 
 #[tauri::command]
 async fn get_settings(state: tauri::State<'_, AppState>) -> Result<AppSettings, ()> {
-    return Ok(*state.app_settings.lock().await);
+    return Ok(*state.app_settings.get().unwrap().lock().await);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -202,11 +204,39 @@ pub fn run() {
         .manage(AppState {
             board: Mutex::new(Board::new_game()),
             repetition_map: Mutex::new(BTreeMap::new()),
-            opening_book: OpeningBook::from_file("opening_book.txt"),
-            app_settings: Mutex::new(AppSettings::get_from_file("settings.toml").unwrap()),
+            opening_book: OnceLock::new(),
+            app_settings: OnceLock::new(),
             cancel_counter: OnceLock::new(),
         })
         .setup(|app| {
+            let opening_book_path = app
+                .path()
+                .resolve("resources/opening_book.txt", BaseDirectory::Resource)
+                .unwrap();
+
+            let settings_path = app
+                .path()
+                .resolve("resources/settings.toml", BaseDirectory::Resource)
+                .unwrap();
+
+            println!("{opening_book_path:?}");
+            println!("{settings_path:?}");
+
+            app.state::<AppState>()
+                .opening_book
+                .set(OpeningBook::from_file(
+                    opening_book_path.as_os_str().to_str().unwrap(),
+                ))
+                .unwrap();
+
+            app.state::<AppState>()
+                .app_settings
+                .set(Mutex::new(
+                    AppSettings::get_from_file(settings_path.as_os_str().to_str().unwrap())
+                        .unwrap(),
+                ))
+                .unwrap();
+
             let counter = Arc::new(Mutex::new(0));
             app.state::<AppState>()
                 .cancel_counter
