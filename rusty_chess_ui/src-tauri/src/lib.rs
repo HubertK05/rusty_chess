@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     sync::{Arc, OnceLock},
 };
 
@@ -59,7 +59,6 @@ impl AppState {
             .and_modify(|x| *x += 1)
             .or_insert(1);
 
-        println!("Attempting to emit event");
         app.emit("update-board", *board_guard)
             .map_err(|e| format!("Failed to send update-board event: {e:?}"))?;
 
@@ -150,7 +149,6 @@ async fn autoplay_move(
         { *state.cancel_counter.get().unwrap().lock().await != starting_cancel_count };
 
     if is_canceled {
-        println!("Canceled");
         return Ok(CancelResult::Canceled);
     }
 
@@ -218,9 +216,6 @@ pub fn run() {
                 .path()
                 .resolve("resources/settings.toml", BaseDirectory::Resource)
                 .unwrap();
-
-            println!("{opening_book_path:?}");
-            println!("{settings_path:?}");
 
             app.state::<AppState>()
                 .opening_book
