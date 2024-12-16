@@ -33,6 +33,8 @@
     ],
     "resources": [
         "resources/**/*"
-    ]
+    ],
+    "licenseFile": "../LICENSE",
+    "license": "MIT"
   }
 }
