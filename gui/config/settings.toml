@@ -1,4 +1,0 @@
-eval_print = true
-pruning = true
-positional_value_factor = 60
-search_depth = 6
