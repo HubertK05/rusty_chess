@@ -90,7 +90,7 @@
     <div class="mb-6">
       <Label for="default-input" class="block mb-2">Search depth</Label>
       <Range
-        id="pos-val-factor"
+        id="search-depth"
         min="1"
         max="10"
         bind:value={settings.search_depth}
@@ -98,7 +98,8 @@
       <p>Value: {settings.search_depth}</p>
     </div>
     <div class="mb-6">
-      <Label for="small-input" class="block mb-2">Positional value factor</Label
+      <Label for="small-input" class="block mb-2"
+        >Positional value factor (lower = more materialistic)</Label
       >
       <Range
         id="pos-val-factor"
