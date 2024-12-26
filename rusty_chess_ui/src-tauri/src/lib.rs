@@ -23,7 +23,9 @@ struct AppState {
     repetition_map: Mutex<BTreeMap<u64, u8>>,
     opening_book: OnceLock<OpeningBook>,
     app_settings: OnceLock<Mutex<AppSettings>>,
-    cancel_counter: OnceLock<Arc<Mutex<u32>>>,
+    turn_counter: OnceLock<Arc<Mutex<u32>>>,
+    chosen_move: Mutex<OptionPoll<ChessMove>>,
+    toggled: Arc<Mutex<bool>>,
 }
 
 enum GameOutcome {
@@ -35,6 +37,13 @@ enum GameOutcome {
 enum CancelResult {
     Canceled,
     NotCanceled,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OptionPoll<T> {
+    None,
+    Pending,
+    Ready(T),
 }
 
 impl AppState {
@@ -69,6 +78,9 @@ impl AppState {
                 .map_err(|e| format!("Failed to send end-game event: {e:?}"))?;
         }
 
+        *self.chosen_move.lock().await = OptionPoll::None;
+        *self.toggled.lock().await = false;
+        *self.turn_counter.get().unwrap().lock().await += 1;
         Ok(())
     }
 
@@ -110,6 +122,8 @@ impl AppState {
     async fn restart(&self) {
         *self.board.lock().await = Board::new_game();
         *self.repetition_map.lock().await = BTreeMap::new();
+        *self.toggled.lock().await = false;
+        *self.chosen_move.lock().await = OptionPoll::None;
     }
 }
 
@@ -118,13 +132,27 @@ async fn autoplay_move(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CancelResult, String> {
+    *state.toggled.lock().await = true;
+    let chosen_move = { *state.chosen_move.lock().await };
+
+    if chosen_move == OptionPoll::Pending {
+        return Ok(CancelResult::Canceled);
+    }
+
+    if let OptionPoll::Ready(chosen_move) = chosen_move {
+        state.play_move_loudly(app, chosen_move).await?;
+        return Ok(CancelResult::NotCanceled);
+    }
+
+    *state.chosen_move.lock().await = OptionPoll::Pending;
+
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
 
     let board = board_guard.clone();
     drop(board_guard);
 
-    let starting_cancel_count = { *state.cancel_counter.get().unwrap().lock().await };
+    let starting_turn_count = { *state.turn_counter.get().unwrap().lock().await };
 
     let chosen_move =
         if let Some(move_vec) = state.opening_book.get().unwrap().0.get(&fen.to_draw_fen()) {
@@ -145,19 +173,19 @@ async fn autoplay_move(
             thread.join().unwrap()
         };
 
-    let is_canceled =
-        { *state.cancel_counter.get().unwrap().lock().await != starting_cancel_count };
+    let Some(chosen_move) = chosen_move else {
+        return Err("Failed to choose move".into());
+    };
 
-    if is_canceled {
+    let is_redundant = { *state.turn_counter.get().unwrap().lock().await != starting_turn_count };
+
+    if !(*state.toggled.lock().await) || is_redundant {
+        *state.chosen_move.lock().await = OptionPoll::Ready(chosen_move);
         return Ok(CancelResult::Canceled);
     }
 
-    if let Some(m) = chosen_move {
-        state.play_move_loudly(app, m).await?;
-        Ok(CancelResult::NotCanceled)
-    } else {
-        return Err("Failed to choose move".into());
-    }
+    state.play_move_loudly(app, chosen_move).await?;
+    Ok(CancelResult::NotCanceled)
 }
 
 #[tauri::command]
@@ -204,7 +232,9 @@ pub fn run() {
             repetition_map: Mutex::new(BTreeMap::new()),
             opening_book: OnceLock::new(),
             app_settings: OnceLock::new(),
-            cancel_counter: OnceLock::new(),
+            turn_counter: OnceLock::new(),
+            chosen_move: Mutex::new(OptionPoll::None),
+            toggled: Arc::new(Mutex::new(false)),
         })
         .setup(|app| {
             let opening_book_path = app
@@ -234,13 +264,15 @@ pub fn run() {
 
             let counter = Arc::new(Mutex::new(0));
             app.state::<AppState>()
-                .cancel_counter
+                .turn_counter
                 .set(Arc::clone(&counter))
                 .expect("Attempted to set the channel more than once");
+
+            let toggled = app.state::<AppState>().toggled.clone();
             app.listen("cancel-move", move |_| {
-                let value = counter.clone();
+                let toggled = toggled.clone();
                 spawn(async move {
-                    *value.lock().await += 1;
+                    *toggled.lock().await = false;
                 });
             });
             Ok(())
