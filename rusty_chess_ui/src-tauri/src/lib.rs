@@ -124,6 +124,7 @@ impl AppState {
         *self.repetition_map.lock().await = BTreeMap::new();
         *self.toggled.lock().await = false;
         *self.chosen_move.lock().await = OptionPoll::None;
+        *self.turn_counter.get().unwrap().lock().await += 1;
     }
 }
 
@@ -179,7 +180,11 @@ async fn autoplay_move(
 
     let is_redundant = { *state.turn_counter.get().unwrap().lock().await != starting_turn_count };
 
-    if !(*state.toggled.lock().await) || is_redundant {
+    if is_redundant {
+        return Ok(CancelResult::Canceled);
+    }
+
+    if !(*state.toggled.lock().await) {
         *state.chosen_move.lock().await = OptionPoll::Ready(chosen_move);
         return Ok(CancelResult::Canceled);
     }
