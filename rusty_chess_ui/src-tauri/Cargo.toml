@@ -26,3 +26,4 @@ serde_json = "1"
 backend = { path = "../../backend" }
 rand = "0.8.5"
 dotenvy = "0.15.7"
+tokio = "1.42.0"
