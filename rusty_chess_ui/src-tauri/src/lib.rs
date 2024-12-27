@@ -17,6 +17,7 @@ use tauri::{
     path::BaseDirectory,
     AppHandle, Emitter, Listener, Manager,
 };
+use tokio::sync::Notify;
 
 struct AppState {
     board: Mutex<Board>,
@@ -24,8 +25,15 @@ struct AppState {
     opening_book: OnceLock<OpeningBook>,
     app_settings: OnceLock<Mutex<AppSettings>>,
     turn_counter: OnceLock<Arc<Mutex<u32>>>,
-    chosen_move: Mutex<OptionPoll<ChessMove>>,
-    toggled: Arc<Mutex<bool>>,
+    toggled: Arc<Mutex<ToggleState>>,
+    cvar: Notify,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+enum ToggleState {
+    Idle,
+    Running,
+    Waiting,
 }
 
 enum GameOutcome {
@@ -37,13 +45,6 @@ enum GameOutcome {
 enum CancelResult {
     Canceled,
     NotCanceled,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum OptionPoll<T> {
-    None,
-    Pending,
-    Ready(T),
 }
 
 impl AppState {
@@ -78,9 +79,9 @@ impl AppState {
                 .map_err(|e| format!("Failed to send end-game event: {e:?}"))?;
         }
 
-        *self.chosen_move.lock().await = OptionPoll::None;
-        *self.toggled.lock().await = false;
         *self.turn_counter.get().unwrap().lock().await += 1;
+        *self.toggled.lock().await = ToggleState::Idle;
+        self.cvar.notify_waiters();
         Ok(())
     }
 
@@ -122,9 +123,9 @@ impl AppState {
     async fn restart(&self) {
         *self.board.lock().await = Board::new_game();
         *self.repetition_map.lock().await = BTreeMap::new();
-        *self.toggled.lock().await = false;
-        *self.chosen_move.lock().await = OptionPoll::None;
+        *self.toggled.lock().await = ToggleState::Idle;
         *self.turn_counter.get().unwrap().lock().await += 1;
+        self.cvar.notify_waiters();
     }
 }
 
@@ -133,19 +134,15 @@ async fn autoplay_move(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CancelResult, String> {
-    *state.toggled.lock().await = true;
-    let chosen_move = { *state.chosen_move.lock().await };
-
-    if chosen_move == OptionPoll::Pending {
+    let previous_toggle_state = { *state.toggled.lock().await };
+    // println!("{previous_toggle_state:?}");
+    *state.toggled.lock().await = ToggleState::Running;
+    if previous_toggle_state != ToggleState::Idle {
+        state.cvar.notify_waiters();
         return Ok(CancelResult::Canceled);
     }
 
-    if let OptionPoll::Ready(chosen_move) = chosen_move {
-        state.play_move_loudly(app, chosen_move).await?;
-        return Ok(CancelResult::NotCanceled);
-    }
-
-    *state.chosen_move.lock().await = OptionPoll::Pending;
+    *state.toggled.lock().await = ToggleState::Running;
 
     let board_guard = state.board.lock().await;
     let fen = FenNotation::from(&*board_guard);
@@ -178,18 +175,20 @@ async fn autoplay_move(
         return Err("Failed to choose move".into());
     };
 
+    if *state.toggled.lock().await == ToggleState::Waiting {
+        println!("Waiting");
+        state.cvar.notified().await;
+        println!("Notified");
+    }
+
     let is_redundant = { *state.turn_counter.get().unwrap().lock().await != starting_turn_count };
 
     if is_redundant {
         return Ok(CancelResult::Canceled);
     }
 
-    if !(*state.toggled.lock().await) {
-        *state.chosen_move.lock().await = OptionPoll::Ready(chosen_move);
-        return Ok(CancelResult::Canceled);
-    }
-
     state.play_move_loudly(app, chosen_move).await?;
+    // println!("Executed successfully");
     Ok(CancelResult::NotCanceled)
 }
 
@@ -238,8 +237,8 @@ pub fn run() {
             opening_book: OnceLock::new(),
             app_settings: OnceLock::new(),
             turn_counter: OnceLock::new(),
-            chosen_move: Mutex::new(OptionPoll::None),
-            toggled: Arc::new(Mutex::new(false)),
+            toggled: Arc::new(Mutex::new(ToggleState::Idle)),
+            cvar: Notify::new(),
         })
         .setup(|app| {
             let opening_book_path = app
@@ -277,7 +276,10 @@ pub fn run() {
             app.listen("cancel-move", move |_| {
                 let toggled = toggled.clone();
                 spawn(async move {
-                    *toggled.lock().await = false;
+                    let mut guard = toggled.lock().await;
+                    if *guard != ToggleState::Idle {
+                        *guard = ToggleState::Waiting;
+                    }
                 });
             });
             Ok(())
