@@ -7,6 +7,8 @@ pub mod zobrist;
 
 use std::{cmp::Ordering, collections::BTreeMap};
 
+use tokio::sync::broadcast::Receiver;
+
 use self::{
     evaluation::Evaluation,
     pawn_structure::evaluate_pawn_weaknesses,
@@ -23,6 +25,8 @@ use crate::{
     },
     move_register::models::{ChessMove, MoveType},
 };
+
+const CANCEL_CHANNEL_POLL_DEPTH: u8 = 4;
 
 pub const MVV_LVA_TABLE: [[i16; 6]; 6] = [
     //K   Q   R   B   N   P
@@ -109,6 +113,49 @@ pub fn choose_move(
             settings,
         )
     };
+    println!(
+        "eval: {}\nthe number of positions tested: {pos_count}",
+        payload.eval
+    );
+    payload.played_move
+}
+
+pub fn choose_move_cancelable(
+    board: &Board,
+    mut rep_map: BTreeMap<u64, u8>,
+    settings: AppSettings,
+    cancel_channel: &mut Receiver<()>,
+) -> Option<ChessMove> {
+    let limit = match board.turn {
+        Color::White => i16::MAX,
+        Color::Black => i16::MIN,
+    };
+
+    let hash = board.hash_board();
+
+    let (payload, pos_count) = if settings.search_depth == 1 {
+        search_game_tree_cancelable(
+            board,
+            0,
+            settings.search_depth,
+            limit as i32,
+            hash,
+            &mut rep_map,
+            settings,
+            cancel_channel,
+        )
+    } else {
+        search_game_tree_cancelable(
+            board,
+            0,
+            settings.search_depth,
+            limit as i32,
+            hash,
+            &mut rep_map,
+            settings,
+            cancel_channel,
+        )
+    }?;
     println!(
         "eval: {}\nthe number of positions tested: {pos_count}",
         payload.eval
@@ -306,6 +353,135 @@ pub fn search_game_tree(
 
     payload.line.extend(payload.played_move);
     (payload, position_count)
+}
+
+pub fn search_game_tree_cancelable(
+    board: &Board,
+    depth: u8,
+    max_depth: u8,
+    limit: i32,
+    hash: u64,
+    rep_map: &mut BTreeMap<u64, u8>,
+    settings: AppSettings,
+    cancel_channel: &mut Receiver<()>,
+) -> Option<(MovePayload, u64)> {
+    if max_depth - depth == CANCEL_CHANNEL_POLL_DEPTH && cancel_channel.try_recv().is_ok() {
+        return None;
+    }
+
+    let move_set = get_ordered_moves(board);
+    let base_eval =
+        evaluate_position(board).with_positional_factor(settings.positional_value_factor);
+    let is_endgame = is_endgame(board);
+
+    if move_set.len() == 0 {
+        if is_in_check(board) {
+            let eval = match board.turn {
+                Color::White => -25000 + depth as i16 * 100,
+                Color::Black => 25000 - depth as i16 * 100,
+            };
+            let mut res = Evaluation::new();
+            res.material = eval;
+            return Some((MovePayload::new(None, res, Vec::new()), 1));
+        } else {
+            return Some((MovePayload::new(None, Evaluation::new(), Vec::new()), 1));
+        }
+    }
+
+    let mut payload = MovePayload::with_turn(board.turn);
+    let mut position_count = 0;
+
+    for test_move in move_set.into_iter() {
+        let mut new_board = *board;
+        let new_hash = hash_with_move(hash, board, test_move);
+        (&mut new_board)
+            .register_move(test_move)
+            .expect("oops, failed to register move during game search");
+
+        let rep_num = *rep_map.entry(new_hash).and_modify(|x| *x += 1).or_insert(1);
+        let (branch_payload, branch_pos_count) = if rep_num >= 3 {
+            (MovePayload::new(None, Evaluation::new(), Vec::new()), 1)
+        } else {
+            let (mut branch_payload, branch_pos_count) =
+                if depth < max_depth - 1 || (depth == max_depth - 1 && is_forcing(test_move)) {
+                    search_game_tree_cancelable(
+                        &new_board,
+                        depth + 1,
+                        max_depth,
+                        payload.eval.total() as i32,
+                        new_hash,
+                        rep_map,
+                        settings,
+                        cancel_channel,
+                    )
+                } else {
+                    Some((
+                        MovePayload::new(
+                            Some(test_move),
+                            base_eval
+                                + evaluate_chg(board, test_move, is_endgame)
+                                    .with_positional_factor(settings.positional_value_factor),
+                            Vec::new(),
+                        ),
+                        1,
+                    ))
+                }?;
+            if is_endgame && depth == 0 && branch_payload.played_move.is_some() {
+                add_king_dist(&mut branch_payload.eval, &new_board);
+            }
+
+            (branch_payload, branch_pos_count)
+        };
+
+        payload = payload.better_move(
+            MovePayload {
+                played_move: Some(test_move),
+                eval: branch_payload.eval,
+                line: branch_payload.line.clone(),
+            },
+            board.turn,
+        );
+        rep_map.entry(new_hash).and_modify(|x| *x -= 1);
+
+        if depth == 0 && settings.eval_print {
+            if branch_payload.played_move.is_some() {
+                print_eval(
+                    new_board,
+                    test_move,
+                    branch_payload.eval,
+                    &branch_payload.line,
+                );
+            } else {
+                println!("evaluation of the move {test_move}: pruned/no legal move");
+            }
+        }
+
+        position_count += branch_pos_count;
+
+        if settings.pruning {
+            match board.turn {
+                Color::White => {
+                    if branch_payload.eval.total() >= limit {
+                        return Some((
+                            MovePayload::new(None, Evaluation::MAX, Vec::new()),
+                            position_count,
+                        ));
+                    }
+                }
+                Color::Black => {
+                    if branch_payload.eval.total() <= limit {
+                        return Some((
+                            MovePayload::new(None, Evaluation::MIN, Vec::new()),
+                            position_count,
+                        ));
+                    }
+                }
+            };
+        }
+    }
+
+    payload.line.extend(payload.played_move);
+    Some((payload, position_count))
 }
 
 fn evaluate_position(board: &Board) -> Evaluation {
