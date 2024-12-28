@@ -14,7 +14,7 @@ use tauri::{
     path::BaseDirectory,
     AppHandle, Emitter, Listener, Manager,
 };
-use tokio::sync::Notify;
+use tokio::sync::{broadcast::Receiver, Notify};
 
 struct AppState {
     board: Mutex<Board>,
@@ -24,6 +24,7 @@ struct AppState {
     turn_counter: Arc<Mutex<u32>>,
     toggled: Arc<Mutex<ToggleState>>,
     cvar: Notify,
+    chooser: Mutex<MoveChooser>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -131,41 +132,16 @@ async fn autoplay_move(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CancelResult, String> {
-    let previous_toggle_state = { *state.toggled.lock().await };
     // println!("{previous_toggle_state:?}");
     *state.toggled.lock().await = ToggleState::Running;
-    if previous_toggle_state != ToggleState::Idle {
+    let Some(chooser_guard) = state.chooser.try_lock().ok() else {
         state.cvar.notify_waiters();
         return Ok(CancelResult::Canceled);
-    }
-
-    *state.toggled.lock().await = ToggleState::Running;
-
-    let board_guard = state.board.lock().await;
-    let fen = FenNotation::from(&*board_guard);
-
-    let board = board_guard.clone();
-    drop(board_guard);
+    };
 
     let starting_turn_count = { *state.turn_counter.lock().await };
 
-    let chosen_move = if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
-        let mut rng = thread_rng();
-        let san = move_vec
-            .choose_weighted(&mut rng, |(_, popularity)| *popularity)
-            .unwrap();
-        let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
-
-        Some(res)
-    } else {
-        let repetition_map = state.repetition_map.lock().await.clone();
-        let app_settings = { state.app_settings.lock().await.clone() };
-
-        let thread = std::thread::spawn(move || {
-            backend::chess_bot::choose_move(&board, repetition_map, app_settings)
-        });
-        thread.join().unwrap()
-    };
+    let chosen_move = chooser_guard.choose_move(&state).await;
 
     let Some(chosen_move) = chosen_move else {
         return Err("Failed to choose move".into());
@@ -186,6 +162,38 @@ async fn autoplay_move(
     state.play_move_loudly(app, chosen_move).await?;
     // println!("Executed successfully");
     Ok(CancelResult::NotCanceled)
+}
+
+struct MoveChooser {
+    // cancel_channel: Receiver<()>,
+}
+
+impl MoveChooser {
+    async fn choose_move(&self, state: &AppState) -> Option<ChessMove> {
+        let board_guard = state.board.lock().await;
+        let fen = FenNotation::from(&*board_guard);
+
+        let board = board_guard.clone();
+        drop(board_guard);
+
+        if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
+            let mut rng = thread_rng();
+            let san = move_vec
+                .choose_weighted(&mut rng, |(_, popularity)| *popularity)
+                .unwrap();
+            let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
+
+            Some(res)
+        } else {
+            let repetition_map = state.repetition_map.lock().await.clone();
+            let app_settings = { state.app_settings.lock().await.clone() };
+
+            let thread = std::thread::spawn(move || {
+                backend::chess_bot::choose_move(&board, repetition_map, app_settings)
+            });
+            thread.join().unwrap()
+        }
+    }
 }
 
 #[tauri::command]
@@ -251,6 +259,7 @@ pub fn run() {
                 turn_counter: Arc::new(Mutex::new(0)),
                 toggled: toggled.clone(),
                 cvar: Notify::new(),
+                chooser: Mutex::new(MoveChooser {}),
             });
 
             app.listen("cancel-move", move |_| {
