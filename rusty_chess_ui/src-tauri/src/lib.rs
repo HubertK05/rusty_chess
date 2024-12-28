@@ -31,6 +31,44 @@ struct AppState {
     cancel_channel: Sender<()>,
 }
 
+struct MoveChooser {
+    cancel_channel: Receiver<()>,
+}
+
+impl MoveChooser {
+    async fn choose_move(&self, state: &AppState) -> Option<ChessMove> {
+        let board_guard = state.board.lock().await;
+        let fen = FenNotation::from(&*board_guard);
+
+        let board = board_guard.clone();
+        drop(board_guard);
+
+        if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
+            let mut rng = thread_rng();
+            let san = move_vec
+                .choose_weighted(&mut rng, |(_, popularity)| *popularity)
+                .unwrap();
+            let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
+
+            Some(res)
+        } else {
+            let repetition_map = state.repetition_map.lock().await.clone();
+            let app_settings = { state.app_settings.lock().await.clone() };
+            let mut cloned_channel = self.cancel_channel.resubscribe();
+
+            let thread = std::thread::spawn(move || {
+                backend::chess_bot::choose_move_cancelable(
+                    &board,
+                    repetition_map,
+                    app_settings,
+                    &mut cloned_channel,
+                )
+            });
+            thread.join().unwrap()
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum ToggleState {
     Running,
@@ -49,6 +87,22 @@ enum CancelResult {
 }
 
 impl AppState {
+    async fn get_toggle_state(&self) -> ToggleState {
+        *self.toggled.lock().await
+    }
+
+    async fn set_toggle_state(&self, value: ToggleState) {
+        *self.toggled.lock().await = value
+    }
+
+    async fn get_turn_count(&self) -> u32 {
+        *self.turn_counter.lock().await
+    }
+
+    async fn increment_turn_count(&self) {
+        *self.turn_counter.lock().await += 1
+    }
+
     /// Plays a given move, while also sending an event to update the board in the frontend.
     async fn play_move_loudly(
         &self,
@@ -80,7 +134,7 @@ impl AppState {
                 .map_err(|e| format!("Failed to send end-game event: {e:?}"))?;
         }
 
-        *self.turn_counter.lock().await += 1;
+        self.increment_turn_count().await;
         let _ = self.cancel_channel.send(());
         self.cvar.notify_waiters();
         Ok(())
@@ -124,7 +178,7 @@ impl AppState {
     async fn restart(&self) {
         *self.board.lock().await = Board::new_game();
         *self.repetition_map.lock().await = BTreeMap::new();
-        *self.turn_counter.lock().await += 1;
+        self.increment_turn_count().await;
         let _ = self.cancel_channel.send(());
         self.cvar.notify_waiters();
     }
@@ -135,13 +189,13 @@ async fn autoplay_move(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CancelResult, String> {
-    *state.toggled.lock().await = ToggleState::Running;
+    state.set_toggle_state(ToggleState::Running).await;
     let Some(chooser_guard) = state.chooser.try_lock().ok() else {
         state.cvar.notify_waiters();
         return Ok(CancelResult::Canceled);
     };
 
-    let starting_turn_count = { *state.turn_counter.lock().await };
+    let starting_turn_count = state.get_turn_count().await;
 
     let chosen_move = chooser_guard.choose_move(&state).await;
 
@@ -149,56 +203,16 @@ async fn autoplay_move(
         return Ok(CancelResult::Canceled);
     };
 
-    if *state.toggled.lock().await == ToggleState::Waiting {
+    if state.get_toggle_state().await == ToggleState::Waiting {
         state.cvar.notified().await;
     }
 
-    let is_redundant = { *state.turn_counter.lock().await != starting_turn_count };
-
-    if is_redundant {
+    if state.get_turn_count().await != starting_turn_count {
         return Ok(CancelResult::Canceled);
     }
 
     state.play_move_loudly(app, chosen_move).await?;
     Ok(CancelResult::NotCanceled)
-}
-
-struct MoveChooser {
-    cancel_channel: Receiver<()>,
-}
-
-impl MoveChooser {
-    async fn choose_move(&self, state: &AppState) -> Option<ChessMove> {
-        let board_guard = state.board.lock().await;
-        let fen = FenNotation::from(&*board_guard);
-
-        let board = board_guard.clone();
-        drop(board_guard);
-
-        if let Some(move_vec) = state.opening_book.0.get(&fen.to_draw_fen()) {
-            let mut rng = thread_rng();
-            let san = move_vec
-                .choose_weighted(&mut rng, |(_, popularity)| *popularity)
-                .unwrap();
-            let res = parse_move(fen, san.0.clone()).expect("cannot parse move");
-
-            Some(res)
-        } else {
-            let repetition_map = state.repetition_map.lock().await.clone();
-            let app_settings = { state.app_settings.lock().await.clone() };
-            let mut cloned_channel = self.cancel_channel.resubscribe();
-
-            let thread = std::thread::spawn(move || {
-                backend::chess_bot::choose_move_cancelable(
-                    &board,
-                    repetition_map,
-                    app_settings,
-                    &mut cloned_channel,
-                )
-            });
-            thread.join().unwrap()
-        }
-    }
 }
 
 #[tauri::command]
