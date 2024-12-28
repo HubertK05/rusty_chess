@@ -14,7 +14,10 @@ use tauri::{
     path::BaseDirectory,
     AppHandle, Emitter, Listener, Manager,
 };
-use tokio::sync::{broadcast::Receiver, Notify};
+use tokio::sync::{
+    broadcast::{Receiver, Sender},
+    Notify,
+};
 
 struct AppState {
     board: Mutex<Board>,
@@ -25,11 +28,11 @@ struct AppState {
     toggled: Arc<Mutex<ToggleState>>,
     cvar: Notify,
     chooser: Mutex<MoveChooser>,
+    cancel_channel: Sender<()>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 enum ToggleState {
-    Idle,
     Running,
     Waiting,
 }
@@ -78,7 +81,7 @@ impl AppState {
         }
 
         *self.turn_counter.lock().await += 1;
-        *self.toggled.lock().await = ToggleState::Idle;
+        let _ = self.cancel_channel.send(());
         self.cvar.notify_waiters();
         Ok(())
     }
@@ -121,8 +124,8 @@ impl AppState {
     async fn restart(&self) {
         *self.board.lock().await = Board::new_game();
         *self.repetition_map.lock().await = BTreeMap::new();
-        *self.toggled.lock().await = ToggleState::Idle;
         *self.turn_counter.lock().await += 1;
+        let _ = self.cancel_channel.send(());
         self.cvar.notify_waiters();
     }
 }
@@ -132,7 +135,6 @@ async fn autoplay_move(
     app: AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<CancelResult, String> {
-    // println!("{previous_toggle_state:?}");
     *state.toggled.lock().await = ToggleState::Running;
     let Some(chooser_guard) = state.chooser.try_lock().ok() else {
         state.cvar.notify_waiters();
@@ -144,13 +146,11 @@ async fn autoplay_move(
     let chosen_move = chooser_guard.choose_move(&state).await;
 
     let Some(chosen_move) = chosen_move else {
-        return Err("Failed to choose move".into());
+        return Ok(CancelResult::Canceled);
     };
 
     if *state.toggled.lock().await == ToggleState::Waiting {
-        println!("Waiting");
         state.cvar.notified().await;
-        println!("Notified");
     }
 
     let is_redundant = { *state.turn_counter.lock().await != starting_turn_count };
@@ -160,12 +160,11 @@ async fn autoplay_move(
     }
 
     state.play_move_loudly(app, chosen_move).await?;
-    // println!("Executed successfully");
     Ok(CancelResult::NotCanceled)
 }
 
 struct MoveChooser {
-    // cancel_channel: Receiver<()>,
+    cancel_channel: Receiver<()>,
 }
 
 impl MoveChooser {
@@ -187,9 +186,15 @@ impl MoveChooser {
         } else {
             let repetition_map = state.repetition_map.lock().await.clone();
             let app_settings = { state.app_settings.lock().await.clone() };
+            let mut cloned_channel = self.cancel_channel.resubscribe();
 
             let thread = std::thread::spawn(move || {
-                backend::chess_bot::choose_move(&board, repetition_map, app_settings)
+                backend::chess_bot::choose_move_cancelable(
+                    &board,
+                    repetition_map,
+                    app_settings,
+                    &mut cloned_channel,
+                )
             });
             thread.join().unwrap()
         }
@@ -250,7 +255,8 @@ pub fn run() {
             let settings =
                 AppSettings::get_from_file(settings_path.as_os_str().to_str().unwrap()).unwrap();
 
-            let toggled = Arc::new(Mutex::new(ToggleState::Idle));
+            let toggled = Arc::new(Mutex::new(ToggleState::Running));
+            let (sender, receiver) = tokio::sync::broadcast::channel(1);
             app.manage(AppState {
                 board: Mutex::new(Board::new_game()),
                 repetition_map: Mutex::new(BTreeMap::new()),
@@ -259,16 +265,16 @@ pub fn run() {
                 turn_counter: Arc::new(Mutex::new(0)),
                 toggled: toggled.clone(),
                 cvar: Notify::new(),
-                chooser: Mutex::new(MoveChooser {}),
+                chooser: Mutex::new(MoveChooser {
+                    cancel_channel: receiver,
+                }),
+                cancel_channel: sender,
             });
 
             app.listen("cancel-move", move |_| {
                 let toggled = toggled.clone();
                 spawn(async move {
-                    let mut guard = toggled.lock().await;
-                    if *guard != ToggleState::Idle {
-                        *guard = ToggleState::Waiting;
-                    }
+                    *toggled.lock().await = ToggleState::Waiting;
                 });
             });
             Ok(())
