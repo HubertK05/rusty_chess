@@ -156,6 +156,11 @@ pub fn choose_move_cancelable(
             cancel_channel,
         )
     }?;
+
+    if cancel_channel.try_recv().is_ok() {
+        return None;
+    }
+
     println!(
         "eval: {}\nthe number of positions tested: {pos_count}",
         payload.eval
