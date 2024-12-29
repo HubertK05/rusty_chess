@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     board,
+    clicked,
     getLegalMoves,
     legalMoves,
     pieceToString,
@@ -90,8 +91,14 @@
     }
     await playMoveManually(moveToPlay);
   }
+
+  async function handleMoveByClick(from: number, to: number) {
+    console.log(`Moved from ${from} to ${to}`);
+  }
 </script>
 
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class={`
     w-10 h-10 sm:w-16 sm:h-16 overflow-hidden ${getSquareStyle()}
@@ -106,6 +113,15 @@
   }}
   onfinalize={(e) => {
     handleFinalize(e.detail);
+  }}
+  onclick={() => {
+    if (clicked.clicked === null) {
+      clicked.clicked = squareId;
+      console.log(clicked.clicked);
+    } else {
+      handleMoveByClick(clicked.clicked, squareId);
+      clicked.clicked = null;
+    }
   }}
 >
   {#each board.board[row][col] as piece (piece.id)}
