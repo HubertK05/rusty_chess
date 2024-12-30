@@ -109,18 +109,22 @@
     dragDisabled: !(turnState.turn === "white" || turnState.turn === "black"),
   }}
   onconsider={(e) => {
+    clicked.clicked = { state: "dragged" };
     handleConsider(e.detail);
   }}
   onfinalize={(e) => {
+    clicked.clicked = { state: "idle" };
     handleFinalize(e.detail);
   }}
-  onclick={() => {
-    if (clicked.clicked === null) {
-      clicked.clicked = squareId;
-      console.log(clicked.clicked);
-    } else {
-      handleMoveByClick(clicked.clicked, squareId);
-      clicked.clicked = null;
+  onclick={async () => {
+    if (clicked.clicked.state === "idle") {
+      clicked.clicked = { state: "clicked", squareId: squareId };
+      legalMoves.moves = (await getLegalMoves()).filter(
+        (move) => move.from[0] === col && move.from[1] === row
+      );
+    } else if (clicked.clicked.state === "clicked") {
+      handleMoveByClick(clicked.clicked.squareId, squareId);
+      clicked.clicked = { state: "idle" };
     }
   }}
 >

@@ -45,3 +45,5 @@ interface AppSettings {
 }
 
 type CancelResult = "Canceled" | "NotCanceled"
+
+type ClickedState = { state: "idle" } | { state: "clicked", squareId: number } | { state: "dragged" }

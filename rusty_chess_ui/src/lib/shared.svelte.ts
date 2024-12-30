@@ -299,6 +299,6 @@ export async function promotePawn(
     await playMoveManually(playedMove[0]);
 }
 
-export const clicked: { clicked: number | null } = $state({
-    clicked: null
-})
+export const clicked: { clicked: ClickedState } = $state({ clicked: {
+    state: "idle"
+}})
