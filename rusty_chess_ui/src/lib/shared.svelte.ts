@@ -237,6 +237,10 @@ export class PromotionState {
     }
 }
 
+export const clicked: { clicked: ClickedState } = $state({ clicked: {
+    state: "idle"
+}})
+
 export let turnState = new TurnStateMachine();
 export let promotionState = new PromotionState();
 const appWebview = getCurrentWebviewWindow();
@@ -299,6 +303,18 @@ export async function promotePawn(
     await playMoveManually(playedMove[0]);
 }
 
-export const clicked: { clicked: ClickedState } = $state({ clicked: {
-    state: "idle"
-}})
+export function clickOutside(node: Element) {
+    const handleClick = (event: Event) => {
+        if (!node.contains(<Node>event.target)) {
+            node.dispatchEvent(new CustomEvent('outclick'));
+        }
+    };
+
+    document.addEventListener('click', handleClick, true);
+
+    return {
+        destroy() {
+            document.removeEventListener('click', handleClick, true);
+        },
+    };
+}

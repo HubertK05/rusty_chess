@@ -25,6 +25,22 @@
     return (row + col) % 2 === 0 ? "bg-yellow-300" : "bg-orange-800";
   }
 
+  function getMovesBySquares(from: number, to: number) {
+    const movesToPlay = legalMoves.moves.filter((move) => {
+      return (
+        move.from[1] * 8 + move.from[0] === from &&
+        move.to[1] * 8 + move.to[0] === to
+      );
+    });
+
+    console.assert(
+      movesToPlay.length <= 1 || movesToPlay.length === 4,
+      `Expected at most one move to play, got ${movesToPlay}`
+    );
+
+    return movesToPlay;
+  }
+
   async function handleConsider(e: DndEvent<DraggableChessPiece>) {
     board.board[row][col] = e.items;
     if (e.info.trigger === TRIGGERS.DRAG_STARTED) {
@@ -53,16 +69,7 @@
     const toSquareId = squareId;
 
     let movesToPlay: ChessMove[] = [];
-    movesToPlay = legalMoves.moves.filter((move) => {
-      return (
-        move.from[1] * 8 + move.from[0] === fromSquareId &&
-        move.to[1] * 8 + move.to[0] === toSquareId
-      );
-    });
-    console.assert(
-      movesToPlay.length <= 1 || movesToPlay.length === 4,
-      `Expected at most one move to play, got ${movesToPlay}`
-    );
+    movesToPlay = getMovesBySquares(fromSquareId, toSquareId);
 
     if (movesToPlay.length === 0 || movesToPlay.length === 4) {
       e.items.forEach((item) => {
@@ -94,6 +101,34 @@
 
   async function handleMoveByClick(from: number, to: number) {
     console.log(`Moved from ${from} to ${to}`);
+    await handleMoveByClickInner(from, to);
+    legalMoves.moves = [];
+  }
+
+  async function handleMoveByClickInner(from: number, to: number) {
+    const movesToPlay = getMovesBySquares(from, to);
+
+    if (from === to) return;
+    if (movesToPlay.length === 0) return;
+    if (movesToPlay.length === 4) {
+      console.assert(
+        turnState.turn === "black" || turnState.turn == "white",
+        "Expected a player's turn during promotion, not bot"
+      );
+      promotionState.promotionData = movesToPlay;
+
+      return;
+    }
+
+    await playMove(movesToPlay[0]);
+  }
+
+  async function playMove(move: ChessMove) {
+    board.board[move.to[1]][move.to[0]] = JSON.parse(
+      JSON.stringify(board.board[move.from[1]][move.to[0]])
+    );
+    board.board[move.from[1]][move.from[0]] = [];
+    await playMoveManually(move);
   }
 </script>
 
@@ -117,13 +152,28 @@
     handleFinalize(e.detail);
   }}
   onclick={async () => {
+    if (turnState.turn === "blackBot" || turnState.turn === "whiteBot") return;
     if (clicked.clicked.state === "idle") {
       clicked.clicked = { state: "clicked", squareId: squareId };
       legalMoves.moves = (await getLegalMoves()).filter(
         (move) => move.from[0] === col && move.from[1] === row
       );
-    } else if (clicked.clicked.state === "clicked") {
+    } else if (
+      clicked.clicked.state === "clicked" &&
+      getMovesBySquares(clicked.clicked.squareId, squareId).length !== 0
+    ) {
       handleMoveByClick(clicked.clicked.squareId, squareId);
+      clicked.clicked = { state: "idle" };
+    } else if (
+      clicked.clicked.state === "clicked" &&
+      clicked.clicked.squareId !== squareId
+    ) {
+      clicked.clicked = { state: "clicked", squareId: squareId };
+      legalMoves.moves = (await getLegalMoves()).filter(
+        (move) => move.from[0] === col && move.from[1] === row
+      );
+    } else {
+      legalMoves.moves = [];
       clicked.clicked = { state: "idle" };
     }
   }}

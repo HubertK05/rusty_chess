@@ -3,7 +3,10 @@
   import Square from "../components/Square.svelte";
   import {
     board,
+    clicked,
+    clickOutside,
     getAppSettings,
+    legalMoves,
     promotePawn,
     promotionState,
     restartGameState,
@@ -126,7 +129,14 @@
   class="bg-gray-300 dark:bg-[#222] flex justify-center items-center h-screen"
 >
   <div class="flex flex-col lg:flex-row">
-    <div class="shadow-xl dark:shadow-none mb-4 lg:mb-0 lg:mr-4">
+    <div
+      class="shadow-xl dark:shadow-none mb-4 lg:mb-0 lg:mr-4"
+      use:clickOutside
+      onoutclick={() => {
+        clicked.clicked = { state: "idle" };
+        console.log("Clicked outside");
+      }}
+    >
       {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}
         <div class="flex flex-row">
           {#each reversed ? generate_series(8).reverse() : generate_series(8) as col}
@@ -155,6 +165,8 @@
           turnState.restartGame();
           promotionState.promotionData = null;
           board.restart();
+          legalMoves.moves = [];
+          clicked.clicked = { state: "idle" };
           restartGameState();
         }}
       >
