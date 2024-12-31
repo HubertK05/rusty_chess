@@ -141,7 +141,9 @@
   use:dndzone={{
     items,
     dropTargetStyle: {},
-    dragDisabled: !(turnState.turn === "white" || turnState.turn === "black"),
+    dragDisabled:
+      !(turnState.turn === "white" || turnState.turn === "black") ||
+      promotionState.isPromoting,
   }}
   onconsider={(e) => {
     clicked.clicked = { state: "dragged" };
@@ -152,7 +154,12 @@
     handleFinalize(e.detail);
   }}
   onclick={async () => {
-    if (turnState.turn === "blackBot" || turnState.turn === "whiteBot") return;
+    if (
+      turnState.turn === "blackBot" ||
+      turnState.turn === "whiteBot" ||
+      promotionState.isPromoting
+    )
+      return;
     if (clicked.clicked.state === "idle") {
       clicked.clicked = { state: "clicked", squareId: squareId };
       legalMoves.moves = (await getLegalMoves()).filter(
