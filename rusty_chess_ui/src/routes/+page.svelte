@@ -16,6 +16,8 @@
   import { listen } from "@tauri-apps/api/event";
   import { Button, DarkMode, Label, Modal, Range } from "flowbite-svelte";
 
+  const MAXIMUM_FAST_SEARCH_DEPTH = 6;
+
   let reversed = $state(false);
   let settings: AppSettings | null = $state(null);
 
@@ -98,7 +100,11 @@
         max="10"
         bind:value={settings.search_depth}
       />
-      <p>Value: {settings.search_depth}</p>
+      {#if settings.search_depth <= MAXIMUM_FAST_SEARCH_DEPTH}
+        <p>Value: {settings.search_depth}</p>
+      {:else}
+        <p>Value: {settings.search_depth} - may take a long time!</p>
+      {/if}
     </div>
     <div class="mb-6">
       <Label for="small-input" class="block mb-2"
