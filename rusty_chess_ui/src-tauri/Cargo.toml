@@ -1,8 +1,8 @@
 [package]
 name = "rusty_chess"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.1.0-beta.2"
+description = "An example Tauri application - chess UI + chess bot"
+authors = ["HubertK05 <hubert.klimowicz.hk@gmail.com>"]
 edition = "2021"
 license = "MIT"
 
