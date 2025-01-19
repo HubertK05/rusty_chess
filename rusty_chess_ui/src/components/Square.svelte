@@ -100,7 +100,6 @@
   }
 
   async function handleMoveByClick(from: number, to: number) {
-    console.log(`Moved from ${from} to ${to}`);
     await handleMoveByClickInner(from, to);
     legalMoves.moves = [];
   }

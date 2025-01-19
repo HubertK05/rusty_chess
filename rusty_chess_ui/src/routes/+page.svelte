@@ -140,7 +140,6 @@
       use:clickOutside
       onoutclick={() => {
         clicked.clicked = { state: "idle" };
-        console.log("Clicked outside");
       }}
     >
       {#each reversed ? generate_series(8) : generate_series(8).reverse() as row}

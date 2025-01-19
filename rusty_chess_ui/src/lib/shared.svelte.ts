@@ -75,13 +75,11 @@ export class CurrentBotState {
     }
 
     toggle() {
-        console.log(this._state, "off", this._state === "off");
         if (this._state === "off") {
             this._state = "on"
         } else {
             this._state = "off"
         }
-        console.log(this._state)
     }
 }
 
